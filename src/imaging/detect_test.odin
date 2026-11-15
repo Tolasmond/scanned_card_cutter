@@ -1,14 +1,15 @@
 package imaging
 
 // Synthetic scans ported from the original detector's test suite
-// (workers/test_candidate_detector.py).
+// (workers/test_candidate_detector.py). The drawing helpers are shared with
+// detect_blocks_test.odin, which tests the additions to the port.
 
 import "core:testing"
 
-@(private = "file")
+@(private)
 BED :: [3]u8{240, 236, 232} // the original tests' BGR (232, 236, 240)
 
-@(private = "file")
+@(private)
 background :: proc(w, h: int) -> Image {
 	img := image_make(w, h)
 	bed := BED
@@ -16,7 +17,7 @@ background :: proc(w, h: int) -> Image {
 	return img
 }
 
-@(private = "file")
+@(private)
 put :: #force_inline proc(img: ^Image, x, y: int, c: [3]u8) {
 	if x < 0 || y < 0 || x >= img.w || y >= img.h do return
 	p := img.pix[(y * img.w + x) * 4:]
@@ -24,10 +25,10 @@ put :: #force_inline proc(img: ^Image, x, y: int, c: [3]u8) {
 }
 
 // Colours are written as in the Python tests (BGR) and stored as RGB.
-@(private = "file")
+@(private)
 bgr :: proc(b, g, r: u8) -> [3]u8 {return {r, g, b}}
 
-@(private = "file")
+@(private)
 fill_convex :: proc(img: ^Image, q: [4][2]int, c: [3]u8) {
 	lo, hi := q[0], q[0]
 	for p in q {lo = {min(lo.x, p.x), min(lo.y, p.y)}; hi = {max(hi.x, p.x), max(hi.y, p.y)}}
@@ -48,19 +49,19 @@ fill_convex :: proc(img: ^Image, q: [4][2]int, c: [3]u8) {
 	}
 }
 
-@(private = "file")
+@(private)
 fill_rect :: proc(img: ^Image, x0, y0, x1, y1: int, c: [3]u8) {
 	for y in y0 ..= y1 do for x in x0 ..= x1 do put(img, x, y, c)
 }
 
-@(private = "file")
+@(private)
 fill_circle :: proc(img: ^Image, cx, cy, r: int, c: [3]u8) {
 	for y in cy - r ..= cy + r do for x in cx - r ..= cx + r {
 		if (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r do put(img, x, y, c)
 	}
 }
 
-@(private = "file")
+@(private)
 fill_rounded :: proc(img: ^Image, q: [4][2]int, r: int, c: [3]u8) {
 	l, t := q[0].x, q[0].y
 	rt, b := q[2].x, q[2].y
@@ -69,7 +70,7 @@ fill_rounded :: proc(img: ^Image, q: [4][2]int, r: int, c: [3]u8) {
 	for p in ([4][2]int{{l + r, t + r}, {rt - r, t + r}, {rt - r, b - r}, {l + r, b - r}}) do fill_circle(img, p.x, p.y, r, c)
 }
 
-@(private = "file")
+@(private)
 expect_corners :: proc(t: ^testing.T, got: Quad, want: [4][2]int, tol: f64, loc := #caller_location) {
 	for k in 0 ..< 4 {
 		if abs(got[k].x - f64(want[k].x)) > tol || abs(got[k].y - f64(want[k].y)) > tol {

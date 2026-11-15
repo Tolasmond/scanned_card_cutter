@@ -15,6 +15,20 @@ package imaging
 //      drop proposals that contain several others, and recover missing cards
 //      from the row/column layout.
 //
+// Three stages were added to the port, each measured on the synthetic corpus
+// (see README.md, "Synthetic scans"):
+//
+//   * detect_blocks.odin splits blocks of touching or overlapping cards at
+//     the notches their rounded corners leave, without needing a card size,
+//     and restores edges hidden under an overlapping card. It runs before the
+//     original grid split, which still handles what it leaves.
+//   * suppress_artwork (below) drops proposals that are artwork inside a card.
+//   * detect_frames.odin moves a card's sides from the artwork out to the
+//     faint real edge when its frame has the colour of the scanner bed.
+//
+// Anything a stage infers rather than measures comes back with a source other
+// than Full_Resolution_Edges, so the application marks the card for review.
+//
 // Always run this on the original scan, never on the moiré-filtered copy:
 // the filter softens edges and the bed texture the detector relies on.
 
@@ -25,7 +39,8 @@ import "core:sync"
 Card_Source :: enum {
 	Full_Resolution_Edges, // sides fitted to real edges: high confidence
 	Coarse_Geometry, // edge fit failed, mask outline only: review
-	Layout_Recovery, // grid cell or inferred from the layout: review
+	Layout_Recovery, // grid cell, block cell or inferred from the layout: review
+	Faint_Outer_Edges, // sides moved out to a faint edge around a bed-coloured frame: review
 }
 
 Card_Candidate :: struct {
@@ -39,7 +54,7 @@ Card_Candidate :: struct {
 @(private = "file") MIN_AREA_RATIO :: 0.01
 @(private = "file") MAX_AREA_RATIO :: 0.80
 @(private = "file") POLY_EPS_RATIO :: 0.02
-@(private = "file") LAB_THRESHOLDS :: [3]f32{12, 18, 26}
+@(private) LAB_THRESHOLDS :: [3]f32{12, 18, 26}
 @(private = "file") MIN_RECTANGULARITY :: 0.72
 @(private = "file") CANNY_LOW :: 24
 @(private = "file") CANNY_HIGH :: 72
@@ -61,19 +76,22 @@ Card_Candidate :: struct {
 @(private = "file") THIN_GAP_FLANK :: 7
 @(private = "file") THIN_GAP_COVERAGE :: 0.15
 @(private = "file") THIN_GAP_LINE_DIVISOR :: 30
-@(private = "file") GRID_MAX_CELLS :: 8
+@(private) GRID_MAX_CELLS :: 8
 @(private = "file") GRID_NOTCH_DEPTH_RATIO :: 0.04
 @(private = "file") GRID_NOTCH_HALF_WIDTH_RATIO :: 0.01
 @(private = "file") GRID_NOTCH_MIN_FRACTION :: 0.5
 @(private = "file") GRID_NOTCH_MAX_CONTROL :: 0.25
 @(private = "file") GRID_CELL_DUP_OVERLAP :: 0.5
+@(private = "file") BLOCK_AGREE_RATIO :: 0.008 // a proposal and a block cell agree within this fraction of the card's shorter side
 @(private = "file") CONTAINER_MIN_INSIDE :: 0.90
 @(private = "file") CONTAINER_MAX_INNER_RATIO :: 0.75
+@(private = "file") ARTWORK_MIN_SUPPORT :: 3 // cards that must share a size before a proposal inside one of them counts as artwork
+@(private = "file") ARTWORK_MAX_AREA_RATIO :: 0.90 // ... and the proposal's area against that card's
 
 Quad :: [4]Vec2
 
 // A float image plane (background distance).
-@(private = "file")
+@(private)
 Plane :: struct {
 	w, h: int,
 	pix:  []f32,
@@ -140,6 +158,70 @@ detect_cards :: proc(src: Image, allocator := context.allocator) -> []Card_Candi
 		append(&entries, Entry{refined, .Full_Resolution_Edges if refined != mapped else .Coarse_Geometry})
 	}
 
+	// Blocks of touching or overlapping cards split at their notches, largest
+	// block first; the cells then take part in everything below like proposals.
+	by_area := make([]int, len(entries), context.temp_allocator)
+	for _, i in entries do by_area[i] = i
+	areas := make([]f64, len(entries), context.temp_allocator)
+	for e, i in entries {
+		q := e.corners
+		areas[i] = polygon_area(q[:])
+	}
+	for i in 1 ..< len(by_area) {
+		for j := i; j > 0 && areas[by_area[j]] > areas[by_area[j - 1]]; j -= 1 do by_area[j], by_area[j - 1] = by_area[j - 1], by_area[j]
+	}
+	was_split := make([]bool, len(entries), context.temp_allocator)
+	block_cells := make([dynamic]Quad, context.temp_allocator)
+	cell_sound := make([dynamic]bool, context.temp_allocator) // no side of the cell is a guess past visible bed
+	// Sizes of the cards found directly: witnesses for the size of block cells.
+	sizes := make([dynamic]f64, context.temp_allocator)
+	for e in entries {
+		if e.source != .Full_Resolution_Edges do continue
+		d := quad_dimensions(e.corners)
+		append(&sizes, d.x, d.y)
+	}
+	for i in by_area {
+		cells, cols, rows, ok := split_block(gray, bgdist, entries[i].corners)
+		if !ok do continue
+		was_split[i] = true
+		restore_hidden_sides(cells[:], cols, rows, sizes[:], gray.w, gray.h)
+		next: for c in cells {
+			for o in block_cells {
+				if overlap_fraction(c.corners, o) >= GRID_CELL_DUP_OVERLAP || overlap_fraction(o, c.corners) >= GRID_CELL_DUP_OVERLAP do continue next
+			}
+			append(&block_cells, c.corners)
+			// An unfitted side is sound only as a seam between touching cards,
+			// where the notches place it; with bed in between, the card's edge
+			// is somewhere short of the seam.
+			append(&cell_sound, c.fitted + (c.seams - c.gapped) == {0, 1, 2, 3})
+		}
+	}
+	if len(block_cells) > 0 {
+		// A direct proposal for the same card as a cell. When the two agree the
+		// proposal stands (its edges are confirmed). Otherwise the cell does,
+		// because the proposal's side towards its neighbour had no bed to stop
+		// at, unless one of the cell's own sides is a guess (see cell_sound).
+		unsplit := make([dynamic]Entry, context.temp_allocator)
+		cell_dropped := make([]bool, len(block_cells), context.temp_allocator)
+		for e, i in entries {
+			if was_split[i] do continue
+			keep := true
+			for c, ci in block_cells {
+				if cell_dropped[ci] do continue
+				if overlap_fraction(c, e.corners) < GRID_CELL_DUP_OVERLAP || overlap_fraction(e.corners, c) < GRID_CELL_DUP_OVERLAP do continue
+				dims := quad_dimensions(c)
+				tol := max(4.0, min(dims.x, dims.y) * BLOCK_AGREE_RATIO)
+				agree := true
+				for k in 0 ..< 4 do if vec_len(c[k] - e.corners[k]) > tol do agree = false
+				if e.source == .Full_Resolution_Edges && (agree || !cell_sound[ci]) do cell_dropped[ci] = true
+				else do keep = false
+			}
+			if keep do append(&unsplit, e)
+		}
+		for c, ci in block_cells do if !cell_dropped[ci] do append(&unsplit, Entry{c, .Layout_Recovery})
+		entries = unsplit
+	}
+
 	quads := make([dynamic]Quad, context.temp_allocator)
 	for e in entries do append(&quads, e.corners)
 	direct, cells := decompose_composites(quads[:], bgdist)
@@ -151,6 +233,7 @@ detect_cards :: proc(src: Image, allocator := context.allocator) -> []Card_Candi
 		append(&kept, Entry{refined, .Layout_Recovery})
 	}
 	kept = suppress_containers(kept[:])
+	kept = suppress_artwork(kept[:])
 	kept_quads := make([dynamic]Quad, context.temp_allocator)
 	for e in kept do append(&kept_quads, e.corners)
 	order := stable_corner_order(kept_quads[:])
@@ -170,11 +253,74 @@ detect_cards :: proc(src: Image, allocator := context.allocator) -> []Card_Candi
 		}
 		append(&out, Card_Candidate{q, source})
 	}
+	// Frames in the bed's colour: move the sides from the artwork out to the
+	// card's faint real edge. Every card is tested against the others as they
+	// were found, so the result does not depend on the order.
+	found := make([]Quad, len(out), context.temp_allocator)
+	for c, i in out do found[i] = c.corners
+	others := make([dynamic]Quad, context.temp_allocator)
+	for &c, i in out {
+		if c.source != .Full_Resolution_Edges do continue
+		clear(&others)
+		for q, j in found do if j != i do append(&others, q)
+		if grown, ok := grow_to_faint_edges(gray, found[i], others[:]); ok {
+			c.corners = grown
+			c.source = .Faint_Outer_Edges
+		}
+	}
 	return out[:]
 
 	any_same :: proc(q: Quad, entries: []Entry) -> bool {
 		for e in entries do if same_corners(q, e.corners) do return true
 		return false
+	}
+	// Artwork inside a card can be a proposal of its own (a dark figure on a
+	// pale frame). When most cards on the scan share one size, a proposal that
+	// lies inside a card of that size, and is not of that size itself, is
+	// artwork. Without a common size nothing says which of the two is the card.
+	suppress_artwork :: proc(entries: []Entry) -> [dynamic]Entry {
+		kept := make([dynamic]Entry, context.temp_allocator)
+		n := len(entries)
+		ws := make([]f64, n, context.temp_allocator)
+		hs := make([]f64, n, context.temp_allocator)
+		areas := make([]f64, n, context.temp_allocator)
+		for e, i in entries {
+			q := e.corners
+			d := quad_dimensions(q)
+			ws[i], hs[i] = d.x, d.y
+			areas[i] = polygon_area(q[:])
+		}
+		// The common size: the one most proposals share (the larger on a tie).
+		common := make([]bool, n, context.temp_allocator)
+		support := 0
+		best := -1
+		for i in 0 ..< n {
+			count := 0
+			for j in 0 ..< n {
+				if abs(ws[j] - ws[i]) <= ws[i] * LAYOUT_DIM_TOL && abs(hs[j] - hs[i]) <= hs[i] * LAYOUT_DIM_TOL do count += 1
+			}
+			if count > support || (count == support && best >= 0 && areas[i] > areas[best]) {
+				support = count
+				best = i
+			}
+		}
+		for i in 0 ..< n {
+			if best < 0 do break
+			common[i] = abs(ws[i] - ws[best]) <= ws[best] * LAYOUT_DIM_TOL && abs(hs[i] - hs[best]) <= hs[best] * LAYOUT_DIM_TOL
+		}
+		for e, i in entries {
+			artwork := false
+			if support >= ARTWORK_MIN_SUPPORT && !common[i] {
+				for o, j in entries {
+					if j != i && common[j] && areas[i] < areas[j] * ARTWORK_MAX_AREA_RATIO && overlap_fraction(e.corners, o.corners) >= CONTAINER_MIN_INSIDE {
+						artwork = true
+						break
+					}
+				}
+			}
+			if !artwork do append(&kept, e)
+		}
+		return kept
 	}
 	suppress_containers :: proc(entries: []Entry) -> [dynamic]Entry {
 		kept := make([dynamic]Entry, context.temp_allocator)
@@ -230,7 +376,7 @@ init_srgb :: proc() {
 	}
 }
 
-@(private = "file")
+@(private)
 lab_plane :: proc(img: Image) -> []f32 {
 	sync.once_do(&srgb_once, init_srgb)
 	out := make([]f32, img.w * img.h * 3)
@@ -251,7 +397,7 @@ lab_plane :: proc(img: Image) -> []f32 {
 
 // Dominant border colour: the most populated 8-unit Lab bin among the border
 // pixels, then the per-channel median of the pixels in that bin.
-@(private = "file")
+@(private)
 background_color :: proc(lab: []f32, w, h: int) -> [3]f32 {
 	strip := max(2, min(w, h) / 80)
 	border := make([dynamic][3]f32, context.temp_allocator)
@@ -288,7 +434,7 @@ median_f32 :: proc(v: []f32) -> f32 {
 	return s[n / 2] if n % 2 == 1 else (s[n / 2 - 1] + s[n / 2]) / 2
 }
 
-@(private = "file")
+@(private)
 median_f64 :: proc(v: []f64) -> f64 {
 	if len(v) == 0 do return 0
 	s := slice.clone(v, context.temp_allocator)
@@ -297,7 +443,7 @@ median_f64 :: proc(v: []f64) -> f64 {
 	return s[n / 2] if n % 2 == 1 else (s[n / 2 - 1] + s[n / 2]) / 2
 }
 
-@(private = "file")
+@(private)
 background_distance :: proc(img: Image, bg: [3]f32) -> Plane {
 	sync.once_do(&srgb_once, init_srgb)
 	p := Plane{img.w, img.h, make([]f32, img.w * img.h)}
@@ -491,7 +637,7 @@ cross3 :: #force_inline proc(a, b, c: Vec2) -> f64 {
 }
 
 // Sort by angle around the centre, start at the smallest x+y, make clockwise.
-@(private = "file")
+@(private)
 order_quad :: proc(points: Quad) -> Quad {
 	c := (points[0] + points[1] + points[2] + points[3]) / 4
 	p := points
@@ -507,7 +653,7 @@ order_quad :: proc(points: Quad) -> Quad {
 	return o
 }
 
-@(private = "file")
+@(private)
 valid_quad :: proc(q: Quad) -> bool {
 	for i in 0 ..< 4 {
 		if cross3(q[i], q[(i + 1) % 4], q[(i + 2) % 4]) <= 0 do return false
@@ -640,7 +786,7 @@ same_corners :: proc(a, b: Quad) -> bool {
 	return u > 0 && inter / u >= 0.90
 }
 
-@(private = "file")
+@(private)
 overlap_fraction :: proc(first, second: Quad) -> f64 {
 	f, s := first, second
 	a := polygon_area(f[:])
@@ -652,21 +798,21 @@ overlap_fraction :: proc(first, second: Quad) -> f64 {
 // Full-resolution edge refinement
 // ---------------------------------------------------------------------------
 
-@(private = "file")
+@(private)
 sample_gray :: #force_inline proc(g: Gray, x, y: f64) -> f64 {
 	cx := clamp(int(math.floor(x + 0.5)), 0, g.w - 1)
 	cy := clamp(int(math.floor(y + 0.5)), 0, g.h - 1)
 	return f64(g.pix[cy * g.w + cx])
 }
 
-@(private = "file")
+@(private)
 sample_plane :: #force_inline proc(p: Plane, x, y: f64) -> f64 {
 	cx := clamp(int(math.floor(x + 0.5)), 0, p.w - 1)
 	cy := clamp(int(math.floor(y + 0.5)), 0, p.h - 1)
 	return f64(p.pix[cy * p.w + cx])
 }
 
-@(private = "file")
+@(private)
 Line :: struct {
 	point, dir: Vec2,
 }
@@ -700,7 +846,7 @@ refine_corners :: proc(gray: Gray, bgdist: Plane, corners: Quad, fixed: bit_set[
 	return out if valid_quad(out) else corners
 }
 
-@(private = "file")
+@(private)
 line_intersection :: proc(a, b: Line) -> (Vec2, bool) {
 	den := a.dir.x * b.dir.y - a.dir.y * b.dir.x
 	if abs(den) < 0.000001 do return {}, false
@@ -709,7 +855,7 @@ line_intersection :: proc(a, b: Line) -> (Vec2, bool) {
 	return a.point + a.dir * t, true
 }
 
-@(private = "file")
+@(private)
 fit_outer_side :: proc(gray: Gray, bgdist: Plane, first, second: Vec2, inward, outward: int) -> (Line, bool) {
 	d := second - first
 	length := vec_len(d)
