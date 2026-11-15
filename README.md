@@ -7,7 +7,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 1. **Open a scan.** Use *Open scan…* (Ctrl+O), drop a PNG on the window, or pass the path as an argument.
 2. **Mark the cards.** Press **A**, then click a card's 4 corners in any order. A magnifier appears while you click or drag. The orange edge marks the card's top; press **R** to rotate it.
 3. **Adjust.** Drag corners or whole cards, or nudge them with the arrow keys. The preview shows the exact export output and updates as you edit. **P** opens it at full size.
-4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels).
+4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels). Tick **Remove moiré** (M) to filter out the printed halftone pattern (see below).
 5. **Export** (Ctrl+E). Each card is written as `<prefix>_NN.png` to the chosen folder. Dropping a folder on the window sets the output folder.
 
 ## Controls
@@ -23,8 +23,15 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | Wheel, right/middle drag, drag on empty space | Zoom, pan |
 | F | Fit the scan to the window |
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
+| M | Moiré removal on/off |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
 | Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |
+
+### Moiré removal
+
+Printed cards are made of halftone dots, and a flatbed scan of them shows a grainy or wavy moiré pattern. **Remove moiré** runs the original tool's "Soft" descreen filter once over the whole scan in the background: a 1.5x cubic upscale, a 3x3 median, non-local-means denoising in Lab color, a bilateral filter, an area downscale and a light unsharp mask. A 2550 x 3507 scan takes about 2.5 s on 16 threads. Previews, the full-size preview and exports use the cleaned scan once it is ready. The canvas where you place corners always shows the original scan, and card detection will too: the filter softens card edges, which makes them harder to find. Export waits while it runs. Turning the filter off keeps the result, so turning it back on is instant.
+
+The filter is a pure-Odin port of the OpenCV version (`src/imaging/descreen.odin`). Against OpenCV 4.12 it matches 98.4% of output values exactly (never more than 2 levels off), and its non-local-means and Lab stages are bit-exact. The original's own output varies more than that between OpenCV builds, depending on whether OpenCV uses Intel IPP for the cubic resize.
 
 ### Interface scale
 
@@ -79,11 +86,12 @@ Limits to keep in mind when recording:
 
 | Path | Contents |
 | --- | --- |
-| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, multithreaded row helper. Unit tested. |
+| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), multithreaded row helper. Unit tested. |
 | `src/app.odin` | Application state, scan loading, card editing, preview, export requests |
 | `src/main.odin` | Window loop, canvas input and drawing, magnifier, full-size preview |
 | `src/panel.odin` | Side panel UI |
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
+| `src/moire.odin` | Runs the moiré filter once per scan in the background; picks the cleaned or original pixels |
 | `src/export.odin` | Background export thread and PNG writing |
 | `src/ui_scale.odin` | Interface scale: monitor detection, `S()`/`fs()` sizing helpers, scaled dialog frame |
 | `src/fonts.odin` | Inter fonts compiled into the executable, re-rendered for each scale; `draw_text`/`measure_text` |
@@ -94,6 +102,6 @@ Limits to keep in mind when recording:
 ## Roadmap
 
 - [x] Manual card regions, straightening, rounded corners, transparent PNG export, live preview
-- [ ] Moiré (halftone) removal: pure-Odin port of the original "Soft" filter
+- [x] Moiré (halftone) removal: pure-Odin port of the original "Soft" filter
 - [ ] Automatic card detection that proposes regions for the same editor
 - [ ] Native file dialogs on Windows (`IFileOpenDialog`) and macOS (`NSOpenPanel`); multi-OS CI builds

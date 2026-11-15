@@ -19,6 +19,12 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 
 All builds use `-vet -strict-style`. A change is done when `./build.sh test` and `./build.sh replay` both pass.
 
+## Moiré filter
+
+`src/imaging/descreen.odin` ports OpenCV's kernels stage by stage: `INTER_CUBIC` resize, `medianBlur`, `fastNlMeansDenoisingColored` with OpenCV's integer Lab tables, `bilateralFilter`, `INTER_AREA` resize, and float32 unsharp. Keep it numerically faithful. A change to its output is a behavior change: check it against the original (`workers/descreen_image.py` in the old DragonRuby tool) on a real scan before updating any expected results. Record/replay runs the filter synchronously (`app.sync_jobs`) so replays never depend on timing.
+
+**Never locate cards on filtered pixels.** The canvas, corner placement and card detection read the original scan (`app.scan_px`, `app.tex`). Only extraction (previews and exports) reads `extract_source(app)`. The filter softens card edges and the scanner background, which makes detection much worse. It keeps the image geometry, so corners found on the original apply to the cleaned pixels unchanged.
+
 ## Interface scale
 
 All layout sizes are written for 1x and go through `S()` (sizes) and `fs()` (font sizes) in `src/ui_scale.odin`. New UI code must do the same. Draw text with `draw_text`/`measure_text` (or the `_big_` versions) from `src/fonts.odin`, not `rl.DrawText`, which uses raylib's built-in bitmap font. raygui controls already use Inter. Record and replay always run at 1x, so a 1x layout change moves the controls that recordings click. If a replay fails because of one, re-record the test rather than updating its expected results.

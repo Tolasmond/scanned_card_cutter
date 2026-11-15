@@ -209,7 +209,7 @@ harness_frame :: proc(h: ^Harness, app: ^App) -> bool {
 		}
 
 		if h.next < len(h.events) do return true
-		idle := app.job == nil && !app.preview_dirty && !(app.big_open && app.big_dirty)
+		idle := app.job == nil && app.clean_job == nil && !app.preview_dirty && !(app.big_open && app.big_dirty)
 		h.settled = h.settled + 1 if idle else 0
 		if h.settled >= REPLAY_SETTLE_FRAMES do return false
 		last := int(h.events[len(h.events) - 1].frame) if len(h.events) > 0 else 0
@@ -351,6 +351,7 @@ state_dump :: proc(app: ^App) -> string {
 		fmt.sbprintln(&b, "scan none")
 	}
 	fmt.sbprintfln(&b, "output %d x %d radius %d trim %d prefix %q", app.out_w, app.out_h, app.radius, app.trim, buf_string(app.prefix[:]))
+	fmt.sbprintfln(&b, "moire %s", "on" if app.moire else "off")
 	fmt.sbprintfln(&b, "cards %d selected %d focused_corner %d", len(app.regions), app.selected + 1, app.focused_corner + 1)
 	for r, i in app.regions {
 		fmt.sbprintf(&b, "card %d", i + 1)

@@ -33,6 +33,7 @@ main :: proc() {
 		out_h          = 1050,
 		radius         = 36,
 	}
+	app.sync_jobs = h.mode != .Off
 	// Record/replay keep a 1x layout: recorded clicks are window pixels.
 	ui_scale_init(&app.ui, h.mode != .Off)
 	if h.mode == .Off && ui_scale != 1 do ui_size_window(f32(win_w), f32(win_h))
@@ -47,6 +48,7 @@ main :: proc() {
 		free_all(context.temp_allocator)
 		if !harness_frame(&h, &app) do break
 		poll_export(&app)
+		poll_cleaning(&app)
 		handle_drops(&app)
 		if ui_scale_update(&app.ui) do on_ui_scale_changed(&app)
 		if rl.IsWindowResized() {
@@ -146,6 +148,7 @@ handle_keys :: proc(app: ^App) {
 	if app.big_open do return
 
 	if rl.IsKeyPressed(.A) || rl.IsKeyPressed(.N) do start_placing(app)
+	if rl.IsKeyPressed(.M) do set_moire(app, !app.moire)
 	if rl.IsKeyPressed(.F) do fit_view(app)
 	if app.selected < 0 do return
 
@@ -319,6 +322,7 @@ COLOR_TOP :: rl.Color{255, 120, 40, 255}
 
 draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 	dest := rl.Rectangle{v.offset.x, v.offset.y, f32(app.scan.width) * v.zoom, f32(app.scan.height) * v.zoom}
+	// Always the original scan: corners are placed on unfiltered pixels.
 	rl.DrawTexturePro(app.tex, {0, 0, f32(app.tex.width), f32(app.tex.height)}, dest, {}, 0, rl.WHITE)
 
 	for r, i in app.regions {

@@ -51,7 +51,7 @@ parallel_rows :: proc(rows: int, data: rawptr, fn: proc(data: rawptr, y0, y1: in
 	if rows <= 0 do return
 	workers := clamp(os.get_processor_core_count(), 1, 64)
 	job := Row_Job{rows = rows, chunk = max(1, min(32, rows / (workers * 4))), data = data, fn = fn}
-	if workers == 1 || rows < 64 {
+	if workers == 1 || rows < 2 {
 		fn(data, 0, rows)
 		return
 	}

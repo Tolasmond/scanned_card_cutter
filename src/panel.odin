@@ -79,13 +79,19 @@ draw_panel :: proc(app: ^App) {
 	y += ROW + S(6)
 	app.radius = clamp(app.radius, 0, min(app.out_w, app.out_h) / 2)
 	if app.selected < 0 do rl.GuiDisable()
-	if rl.GuiButton({x, y, w, ROW}, "Use selected card's scanned size") && app.selected >= 0 {
+	if rl.GuiButton({x, y, half, ROW}, "Use card's size") && app.selected >= 0 {
 		nw, nh := im.quad_native_size(app.regions[app.selected].corners)
 		app.out_w = i32(nw - 2 * int(app.trim))
 		app.out_h = i32(nh - 2 * int(app.trim))
 		mark_preview_dirty(app)
 	}
 	rl.GuiEnable()
+	// Moiré (halftone) removal, with progress while it runs.
+	moire := app.moire
+	box := S(20)
+	moire_label := fmt.ctprintf("Remove moiré %d%%", moire_percent(app)) if app.moire && app.clean_job != nil else cstring("Remove moiré (M)")
+	rl.GuiCheckBox({x + half + gap, y + (ROW - box) / 2, box, box}, moire_label, &moire)
+	if moire != app.moire do set_moire(app, moire)
 	y += ROW + S(4)
 
 	// --- Cards ----------------------------------------------------------------
@@ -180,8 +186,10 @@ draw_panel :: proc(app: ^App) {
 		rl.GuiProgressBar({x, y, w, ROW + S(4)}, nil, nil, &v, 0, f32(max(total, 1)))
 		draw_text(fmt.ctprintf("Exporting %d / %d", done, total), i32(x + S(10)), i32(y + S(7)), rl.BLACK)
 	} else {
-		if len(app.regions) == 0 do rl.GuiDisable()
-		if rl.GuiButton({x, y, w, ROW + S(4)}, fmt.ctprintf("Export %d card(s)  (Ctrl+E)", len(app.regions))) do request_export(app)
+		pending := moire_pending(app)
+		if len(app.regions) == 0 || pending do rl.GuiDisable()
+		export_label := fmt.ctprintf("Removing moiré... %d%%", moire_percent(app)) if pending else fmt.ctprintf("Export %d card(s)  (Ctrl+E)", len(app.regions))
+		if rl.GuiButton({x, y, w, ROW + S(4)}, export_label) do request_export(app)
 		rl.GuiEnable()
 	}
 

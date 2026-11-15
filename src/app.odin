@@ -36,6 +36,10 @@ App :: struct {
 	// Scan
 	scan:            rl.Image, // full resolution, RGBA8
 	scan_px:         im.Image, // view of scan.data
+	moire:           bool, // remove the moiré (halftone) pattern before extracting
+	cleaned:         im.Image, // moiré-free copy of the scan, for extraction only
+	clean_job:       ^Clean_Job,
+	sync_jobs:       bool, // record/replay: run the moiré filter inline
 	scan_path:       string,
 	tex:             rl.Texture2D, // possibly downscaled for the GPU
 	tex_filter:      rl.TextureFilter,
@@ -125,6 +129,7 @@ mark_preview_dirty :: proc(app: ^App) {
 // ---------------------------------------------------------------------------
 
 unload_scan :: proc(app: ^App) {
+	discard_cleaning(app)
 	if has_scan(app) {
 		rl.UnloadTexture(app.tex)
 		rl.UnloadImage(app.scan)
@@ -162,18 +167,7 @@ load_scan :: proc(app: ^App, path: string) -> bool {
 	app.scan = img
 	app.scan_px = im.Image{w = int(img.width), h = int(img.height), pix = ([^]u8)(img.data)[:img.width * img.height * 4]}
 
-	// GPUs cap texture size; display a reduced copy for very large scans.
-	// All processing still reads the full-resolution pixels.
-	if max(img.width, img.height) > MAX_TEXTURE_DIM {
-		s := f32(MAX_TEXTURE_DIM) / f32(max(img.width, img.height))
-		small := rl.ImageCopy(img)
-		rl.ImageResize(&small, i32(f32(img.width) * s), i32(f32(img.height) * s))
-		app.tex = rl.LoadTextureFromImage(small)
-		rl.UnloadImage(small)
-	} else {
-		app.tex = rl.LoadTextureFromImage(img)
-	}
-	rl.GenTextureMipmaps(&app.tex)
+	app.tex = make_display_texture(img)
 	app.tex_filter = .TRILINEAR
 	rl.SetTextureFilter(app.tex, app.tex_filter)
 
@@ -183,7 +177,25 @@ load_scan :: proc(app: ^App, path: string) -> bool {
 	if buf_string(app.out_dir[:]) == "" do buf_set(app.out_dir[:], os.dir(path))
 	fit_view(app)
 	set_status(app, false, "Opened %s (%d x %d). Press A to add a card, then click its 4 corners.", os.base(path), img.width, img.height)
+	if app.moire do start_cleaning(app)
 	return true
+}
+
+// GPUs cap texture size; display a reduced copy for very large scans.
+// All processing still reads the full-resolution pixels.
+make_display_texture :: proc(img: rl.Image) -> rl.Texture2D {
+	tex: rl.Texture2D
+	if max(img.width, img.height) > MAX_TEXTURE_DIM {
+		s := f32(MAX_TEXTURE_DIM) / f32(max(img.width, img.height))
+		small := rl.ImageCopy(img)
+		rl.ImageResize(&small, i32(f32(img.width) * s), i32(f32(img.height) * s))
+		tex = rl.LoadTextureFromImage(small)
+		rl.UnloadImage(small)
+	} else {
+		tex = rl.LoadTextureFromImage(img)
+	}
+	rl.GenTextureMipmaps(&tex)
+	return tex
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +339,7 @@ render_card_texture :: proc(app: ^App, tex: ^rl.Texture2D, scale: f64) -> bool {
 	ps.width = max(1, int(math.round(f64(s.width) * scale)))
 	ps.height = max(1, int(math.round(f64(s.height) * scale)))
 	ps.corner_radius = int(math.round(f64(s.corner_radius) * scale))
-	out, ok := im.extract_card(app.scan_px, app.regions[app.selected].corners, ps)
+	out, ok := im.extract_card(extract_source(app), app.regions[app.selected].corners, ps)
 	if !ok do return false
 	defer im.image_destroy(&out)
 	tex^ = rl.LoadTextureFromImage({data = raw_data(out.pix), width = i32(out.w), height = i32(out.h), mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8})
@@ -379,6 +391,10 @@ request_export :: proc(app: ^App) {
 		set_status(app, true, "Set the output width and height.")
 		return
 	}
+	if moire_pending(app) {
+		set_status(app, true, "Moiré removal is still running (%d%%). Export when it finishes.", moire_percent(app))
+		return
+	}
 	dir := buf_string(app.out_dir[:])
 	if dir == "" {
 		set_status(app, true, "Choose an output folder.")
@@ -404,7 +420,7 @@ start_export :: proc(app: ^App) {
 	defer delete(paths)
 	items := make([]Export_Item, len(app.regions))
 	for r, i in app.regions do items[i] = {corners = r.corners, path = paths[i]}
-	app.job = export_start(app.scan_px, settings_of(app), items)
+	app.job = export_start(extract_source(app), settings_of(app), items)
 	set_status(app, false, "Exporting %d cards...", len(items))
 }
 
