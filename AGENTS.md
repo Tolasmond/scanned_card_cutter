@@ -19,6 +19,10 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 
 All builds use `-vet -strict-style`. A change is done when `./build.sh test` and `./build.sh replay` both pass.
 
+## Card detection
+
+`src/imaging/detect.odin` is a port of the original detector 1.5.0 (`workers/candidate_detector.py` in the old DragonRuby tool). Its constants and stages match the original. It reads only the original scan. Changing its behavior is a quality decision, so measure it first with `./build.sh bench ANNOTATIONS.json IMAGE_DIR` (development split while tuning, holdout only as the final check) and compare with the numbers before the change. The synthetic tests in `detect_test.odin` come from the original suite and must keep passing. Detected cards with `source != .Full_Resolution_Edges` get `Region.review`, which is cleared when the user edits the card. Record/replay runs detection synchronously.
+
 ## Moiré filter
 
 `src/imaging/descreen.odin` ports OpenCV's kernels stage by stage: `INTER_CUBIC` resize, `medianBlur`, `fastNlMeansDenoisingColored` with OpenCV's integer Lab tables, `bilateralFilter`, `INTER_AREA` resize, and float32 unsharp. Keep it numerically faithful. A change to its output is a behavior change: check it against the original (`workers/descreen_image.py` in the old DragonRuby tool) on a real scan before updating any expected results. Record/replay runs the filter synchronously (`app.sync_jobs`) so replays never depend on timing.

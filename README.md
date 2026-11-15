@@ -5,7 +5,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 ## Workflow
 
 1. **Open a scan.** Use *Open scan…* (Ctrl+O), drop a PNG on the window, or pass the path as an argument.
-2. **Mark the cards.** Press **A**, then click a card's 4 corners in any order. A magnifier appears while you click or drag. The orange edge marks the card's top; press **R** to rotate it.
+2. **Mark the cards.** Press **D** (*Detect cards*) to find them automatically, or press **A** and click a card's 4 corners in any order. A magnifier appears while you click or drag. The orange edge marks the card's top; press **R** to rotate it. Detected cards the detector is unsure of are drawn pink and marked *review* until you adjust them.
 3. **Adjust.** Drag corners or whole cards, or nudge them with the arrow keys. The preview shows the exact export output and updates as you edit. **P** opens it at full size.
 4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels). Tick **Remove moiré** (M) to filter out the printed halftone pattern (see below).
 5. **Export** (Ctrl+E). Each card is written as `<prefix>_NN.png` to the chosen folder. Dropping a folder on the window sets the output folder.
@@ -14,6 +14,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 
 | Input | Action |
 | --- | --- |
+| D | Detect cards automatically (adds only cards not already marked) |
 | A / N | Add a card (click its 4 corners; Esc cancels) |
 | Drag corner / card | Move a corner / the whole card |
 | Arrows (Shift = 10 px) | Nudge the focused corner, or the whole card when no corner is focused |
@@ -26,6 +27,16 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | M | Moiré removal on/off |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
 | Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |
+
+### Card detection
+
+**Detect cards** is a pure-Odin port of the original tool's classical detector (`src/imaging/detect.odin`, ported from detector 1.5.0). It reads the original scan, never the moiré-filtered copy. It finds the scanner-bed color along the border and builds foreground masks from color distance and Canny edges. It removes scanner-lid strips, carves the thin gaps between tightly packed cards, and turns the outlines into four-corner proposals. It then fits each side to the card's outer edge at full resolution, splits outlines that are grids of touching rounded cards, and fills holes in a regular layout. About 0.3 s per 2550 x 3507 scan.
+
+Each detected card becomes an ordinary editable card. Cards whose edges were fitted at full resolution are trusted. Grid splits, layout guesses and coarse outlines are marked *review* (pink) and need a check. Detection never replaces cards you already have; it only adds cards that don't overlap them.
+
+During development the port was checked against the original detector on private scans of tightly packed rounded cards with hand-corrected corners. It found every card, made the same single false proposal as the original, and matched its corner accuracy: a typical corner error of about 6 px, with the largest errors on touching cards whose shared seam shows no edge. Those are the cards marked *review*.
+
+`./build.sh bench ANNOTATIONS.json IMAGE_DIR` scores detection against any annotation file in the format of `tools/detect_bench`.
 
 ### Moiré removal
 
@@ -51,6 +62,7 @@ Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin
 ./build.sh          # Linux / macOS -> build/scan_tool
 ./build.sh test     # imaging unit tests (headless)
 ./build.sh replay   # replay tests (opens a window; see Testing)
+./build.sh bench ANN DIR  # score card detection against annotation file ANN
 build.bat           # Windows -> build\scan_tool.exe (needs the MSVC linker, as Odin does)
 ```
 
@@ -86,11 +98,13 @@ Limits to keep in mind when recording:
 
 | Path | Contents |
 | --- | --- |
-| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), multithreaded row helper. Unit tested. |
+| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), card detection (`detect.odin`, with `morph.odin` for masks/Canny and `contours.odin` for contours and geometry), multithreaded row helper. Unit tested. |
+| `tools/detect_bench/` | Detection benchmark against hand-corrected corners (`./build.sh bench DIR`) |
 | `src/app.odin` | Application state, scan loading, card editing, preview, export requests |
 | `src/main.odin` | Window loop, canvas input and drawing, magnifier, full-size preview |
 | `src/panel.odin` | Side panel UI |
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
+| `src/detection.odin` | Runs detection in the background and adds the results as cards |
 | `src/moire.odin` | Runs the moiré filter once per scan in the background; picks the cleaned or original pixels |
 | `src/export.odin` | Background export thread and PNG writing |
 | `src/ui_scale.odin` | Interface scale: monitor detection, `S()`/`fs()` sizing helpers, scaled dialog frame |
@@ -103,5 +117,5 @@ Limits to keep in mind when recording:
 
 - [x] Manual card regions, straightening, rounded corners, transparent PNG export, live preview
 - [x] Moiré (halftone) removal: pure-Odin port of the original "Soft" filter
-- [ ] Automatic card detection that proposes regions for the same editor
+- [x] Automatic card detection that proposes regions for the same editor
 - [ ] Native file dialogs on Windows (`IFileOpenDialog`) and macOS (`NSOpenPanel`); multi-OS CI builds

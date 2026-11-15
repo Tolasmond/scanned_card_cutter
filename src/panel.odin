@@ -108,9 +108,14 @@ draw_panel :: proc(app: ^App) {
 	y += ROW + S(6)
 	if rl.GuiButton({x, y, half, ROW}, "Rotate (R)") && app.selected >= 0 {
 		rotate_region(&app.regions[app.selected], 1)
+		app.regions[app.selected].review = false
 		mark_preview_dirty(app)
 	}
 	if rl.GuiButton({x + half + gap, y, half, ROW}, "Full preview (P)") do toggle_big_preview(app)
+	rl.GuiEnable()
+	y += ROW + S(6)
+	if !has_scan(app) || app.detect_job != nil do rl.GuiDisable()
+	if rl.GuiButton({x, y, w, ROW}, "Detecting..." if app.detect_job != nil else "Detect cards (D)") do start_detection(app)
 	rl.GuiEnable()
 	y += ROW + S(8)
 
@@ -133,6 +138,10 @@ draw_panel :: proc(app: ^App) {
 		num := fmt.ctprintf("%d", i + 1)
 		draw_text(num, i32(row.x + S(32) - measure_text(num)), i32(ry + S(3)), rl.DARKGRAY)
 		draw_text(fmt.ctprintf("scanned %d × %d", nw, nh), i32(row.x + S(44)), i32(ry + S(3)), rl.DARKGRAY)
+		if r.review {
+			tag: cstring = "review"
+			draw_text(tag, i32(row.x + row.width - S(8) - measure_text(tag)), i32(ry + S(3)), {200, 40, 150, 255})
+		}
 		if !rl.GuiIsLocked() && rl.CheckCollisionPointRec(mouse, row) && rl.CheckCollisionPointRec(mouse, list) && rl.IsMouseButtonPressed(.LEFT) {
 			select_region(app, i)
 		}

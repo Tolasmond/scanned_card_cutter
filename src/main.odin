@@ -49,6 +49,7 @@ main :: proc() {
 		if !harness_frame(&h, &app) do break
 		poll_export(&app)
 		poll_cleaning(&app)
+		poll_detection(&app)
 		handle_drops(&app)
 		if ui_scale_update(&app.ui) do on_ui_scale_changed(&app)
 		if rl.IsWindowResized() {
@@ -149,6 +150,7 @@ handle_keys :: proc(app: ^App) {
 
 	if rl.IsKeyPressed(.A) || rl.IsKeyPressed(.N) do start_placing(app)
 	if rl.IsKeyPressed(.M) do set_moire(app, !app.moire)
+	if rl.IsKeyPressed(.D) do start_detection(app)
 	if rl.IsKeyPressed(.F) do fit_view(app)
 	if app.selected < 0 do return
 
@@ -158,6 +160,7 @@ handle_keys :: proc(app: ^App) {
 	}
 	if rl.IsKeyPressed(.R) {
 		rotate_region(&app.regions[app.selected], -1 if shift else 1)
+		app.regions[app.selected].review = false
 		mark_preview_dirty(app)
 	}
 	if rl.IsKeyPressed(.TAB) {
@@ -319,6 +322,7 @@ handle_big_preview_input :: proc(app: ^App) {
 COLOR_REGION :: rl.Color{80, 200, 255, 255}
 COLOR_SELECTED :: rl.Color{255, 220, 60, 255}
 COLOR_TOP :: rl.Color{255, 120, 40, 255}
+COLOR_REVIEW :: rl.Color{255, 90, 200, 255} // detected with medium confidence
 
 draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 	dest := rl.Rectangle{v.offset.x, v.offset.y, f32(app.scan.width) * v.zoom, f32(app.scan.height) * v.zoom}
@@ -327,7 +331,7 @@ draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 
 	for r, i in app.regions {
 		sel := i == app.selected
-		col := COLOR_SELECTED if sel else COLOR_REGION
+		col := COLOR_SELECTED if sel else (COLOR_REVIEW if r.review else COLOR_REGION)
 		pts: [4]rl.Vector2
 		for c in 0 ..< 4 do pts[c] = to_screen(v, r.corners[c])
 		for c in 1 ..< 4 do rl.DrawLineEx(pts[c], pts[(c + 1) % 4], S(2), col)

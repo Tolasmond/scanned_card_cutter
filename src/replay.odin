@@ -209,7 +209,7 @@ harness_frame :: proc(h: ^Harness, app: ^App) -> bool {
 		}
 
 		if h.next < len(h.events) do return true
-		idle := app.job == nil && app.clean_job == nil && !app.preview_dirty && !(app.big_open && app.big_dirty)
+		idle := app.job == nil && app.clean_job == nil && app.detect_job == nil && !app.preview_dirty && !(app.big_open && app.big_dirty)
 		h.settled = h.settled + 1 if idle else 0
 		if h.settled >= REPLAY_SETTLE_FRAMES do return false
 		last := int(h.events[len(h.events) - 1].frame) if len(h.events) > 0 else 0
@@ -356,6 +356,7 @@ state_dump :: proc(app: ^App) -> string {
 	for r, i in app.regions {
 		fmt.sbprintf(&b, "card %d", i + 1)
 		for c in r.corners do fmt.sbprintf(&b, " (%.2f, %.2f)", c.x, c.y)
+		if r.review do fmt.sbprint(&b, " review")
 		fmt.sbprintln(&b)
 	}
 	fmt.sbprintfln(&b, "preview %s", "open" if app.big_open else "closed")

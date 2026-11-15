@@ -659,13 +659,13 @@ bilateral_cv :: proc(src: Image, d: int, sigma_color, sigma_space: f64, allocato
 // resize INTER_AREA for downscaling (OpenCV computeResizeAreaTab)
 // ---------------------------------------------------------------------------
 
-@(private = "file")
+@(private)
 Area_Tap :: struct {
 	src:    int,
 	weight: f32,
 }
 
-@(private = "file")
+@(private)
 area_taps :: proc(src_len, dst_len: int, allocator := context.allocator) -> (taps: [dynamic]Area_Tap, first: []int) {
 	scale := f64(src_len) / f64(dst_len)
 	taps = make([dynamic]Area_Tap, allocator)

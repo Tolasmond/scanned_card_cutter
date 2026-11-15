@@ -5,12 +5,16 @@
 #   ./build.sh test             run the imaging unit tests
 #   ./build.sh replay           replay tests/replay/*.rec and compare with *.expected/
 #   ./build.sh replay --update  (re)write the expected results from the current build
+#   ./build.sh bench ANN DIR    score card detection: annotation file ANN, scans in DIR
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
 case "$1" in
   debug) odin build src -out:build/scan_tool -debug -vet -strict-style ;;
   test)  odin test src/imaging -vet -strict-style ;;
+  bench)
+    [ -n "$3" ] || { echo "usage: ./build.sh bench ANNOTATIONS.json IMAGE_DIR [development|holdout]"; exit 2; }
+    odin run tools/detect_bench -o:speed -vet -strict-style -out:build/detect_bench -- "$2" "$3" $4 ;;
   replay)
     odin build src -out:build/scan_tool -o:speed -vet -strict-style
     set -- tests/replay/*.rec "$2"

@@ -18,6 +18,7 @@ View :: struct {
 
 Region :: struct {
 	corners: [4]im.Vec2, // TL, TR, BR, BL of the *output* card, in source pixels
+	review:  bool, // detected with medium confidence; cleared once the user edits it
 }
 
 Drag_Kind :: enum {
@@ -39,7 +40,8 @@ App :: struct {
 	moire:           bool, // remove the moiré (halftone) pattern before extracting
 	cleaned:         im.Image, // moiré-free copy of the scan, for extraction only
 	clean_job:       ^Clean_Job,
-	sync_jobs:       bool, // record/replay: run the moiré filter inline
+	sync_jobs:       bool, // record/replay: run background jobs inline
+	detect_job:      ^Detect_Job,
 	scan_path:       string,
 	tex:             rl.Texture2D, // possibly downscaled for the GPU
 	tex_filter:      rl.TextureFilter,
@@ -129,6 +131,7 @@ mark_preview_dirty :: proc(app: ^App) {
 // ---------------------------------------------------------------------------
 
 unload_scan :: proc(app: ^App) {
+	discard_detection(app)
 	discard_cleaning(app)
 	if has_scan(app) {
 		rl.UnloadTexture(app.tex)
@@ -262,6 +265,14 @@ rotate_region :: proc(r: ^Region, steps: int) {
 	for i in 0 ..< 4 do r.corners[i] = c[(i + 4 - s) % 4]
 }
 
+// For a new card (corners clockwise from the top-left on the scan): a portrait
+// output gets the quad's short edge on top, a landscape output its long edge.
+orient_for_output :: proc(app: ^App, r: ^Region) {
+	q := r.corners
+	top, side := edge_len(q[0], q[1]), edge_len(q[0], q[3])
+	if (app.out_h > app.out_w) == (top > side) do rotate_region(r, -1)
+}
+
 finish_placing :: proc(app: ^App) {
 	defer {
 		clear(&app.place_pts)
@@ -272,10 +283,8 @@ finish_placing :: proc(app: ^App) {
 		set_status(app, true, "Those 4 points don't form a card shape. Press A to try again.")
 		return
 	}
-	r := Region{q}
-	// Match the output orientation: a portrait target gets the short edge on top.
-	top, side := edge_len(q[0], q[1]), edge_len(q[0], q[3])
-	if (app.out_h > app.out_w) == (top > side) do rotate_region(&r, -1)
+	r := Region{corners = q}
+	orient_for_output(app, &r)
 	append(&app.regions, r)
 	select_region(app, len(app.regions) - 1)
 	set_status(app, false, "Card %d added. Drag corners to adjust, R to rotate, A to add another.", len(app.regions))
@@ -314,6 +323,7 @@ move_region :: proc(app: ^App, index, corner: int, delta: im.Vec2) -> bool {
 	if !im.quad_is_valid(q) do return false
 	if q != r.corners {
 		r.corners = q
+		r.review = false // the user has looked at this card
 		if index == app.selected do mark_preview_dirty(app)
 	}
 	return true
