@@ -24,6 +24,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | F | Fit the scan to the window |
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
+| Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |
 
 ### Interface scale
 

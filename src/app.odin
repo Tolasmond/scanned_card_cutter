@@ -79,6 +79,7 @@ App :: struct {
 	job:             ^Export_Job,
 	confirm_count:   int, // > 0 while asking to overwrite this many files
 	typing:          bool, // a text box has keyboard focus this frame
+	quit:            bool, // Exit button or Ctrl+Q
 	ui:              Ui_Scale_State,
 
 	status:          [512]u8,

@@ -43,7 +43,7 @@ main :: proc() {
 	if out != "" do buf_set(app.out_dir[:], out)
 	harness_start(&h)
 
-	for !rl.WindowShouldClose() {
+	for !rl.WindowShouldClose() && !app.quit {
 		free_all(context.temp_allocator)
 		if !harness_frame(&h, &app) do break
 		poll_export(&app)
@@ -69,7 +69,7 @@ main :: proc() {
 		if modal do rl.GuiLock()
 		draw_panel(&app)
 		rl.GuiUnlock()
-		draw_status(&app)
+		draw_status(&app, modal)
 		draw_confirm(&app)
 		browser_update_draw(&app.browser, &app.typing)
 		take_browser_result(&app)
@@ -128,6 +128,7 @@ handle_keys :: proc(app: ^App) {
 	ctrl := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.LEFT_SUPER)
 
 	if ui_scale_keys(&app.ui, ctrl) do on_ui_scale_changed(app)
+	if ctrl && rl.IsKeyPressed(.Q) do app.quit = true
 	if ctrl && rl.IsKeyPressed(.O) do open_scan_dialog(app)
 	if ctrl && rl.IsKeyPressed(.E) do request_export(app)
 	if !has_scan(app) do return
@@ -432,11 +433,22 @@ draw_big_preview :: proc(app: ^App) {
 	draw_text(info, i32(S(10)), i32(S(6)), rl.WHITE)
 }
 
-draw_status :: proc(app: ^App) {
+draw_status :: proc(app: ^App, modal: bool) {
 	sh, sw := f32(rl.GetScreenHeight()), f32(rl.GetScreenWidth())
 	rl.DrawRectangleRec({0, sh - status_h, sw, status_h}, {28, 29, 33, 255})
+
+	// Exit button: tiling window managers often show no title bar to close from.
+	label: cstring = "Exit (Ctrl+Q)"
+	bw := measure_text(label) + S(24)
+	button := rl.Rectangle{sw - bw - S(4), sh - status_h + S(3), bw, status_h - S(6)}
+	if modal do rl.GuiLock()
+	if rl.GuiButton(button, label) do app.quit = true
+	rl.GuiUnlock()
+
 	text := strings.clone_to_cstring(status_text(app), context.temp_allocator)
+	rl.BeginScissorMode(0, i32(sh - status_h), i32(button.x - S(8)), i32(status_h))
 	draw_text(text, i32(pad), i32(sh - status_h + S(6)), rl.Color{255, 120, 110, 255} if app.status_error else rl.Color{220, 220, 220, 255})
+	rl.EndScissorMode()
 }
 
 draw_confirm :: proc(app: ^App) {
