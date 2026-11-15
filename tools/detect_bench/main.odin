@@ -4,6 +4,7 @@
 //
 // Annotation file format:
 //   {"scans": [{"id": "...", "split": "development" | "holdout",
+//               "preset": "...",           (optional: adds a per-preset summary)
 //               "image": "file.png",       (relative to IMAGE_DIR)
 //               "regions": [[[x, y], [x, y], [x, y], [x, y]], ...]}]}
 // Regions are each card's corners, clockwise from the top-left, at the
@@ -26,8 +27,23 @@ import rl "vendor:raylib"
 Scan :: struct {
 	id:      string,
 	split:   string,
+	preset:  string, // optional: groups the per-preset summary (tools/synth writes it)
 	image:   string,
 	regions: [][4][2]f64,
+}
+
+// Running totals for one group of scans (a preset or a whole split).
+Tally :: struct {
+	name:                    string,
+	found, total, false_pos: int,
+	scans:                   int,
+	ms:                      f64,
+	errs:                    [dynamic]f64,
+}
+
+print_tally :: proc(t: ^Tally) {
+	fmt.printfln("%-14s recall %d/%d  false %d  corner error median %.2f  p95 %.2f  max %.2f px  (%.0f ms/scan)",
+		t.name, t.found, t.total, t.false_pos, percentile(t.errs[:], 50), percentile(t.errs[:], 95), percentile(t.errs[:], 100), t.ms / f64(max(t.scans, 1)))
 }
 
 Annotations :: struct {
@@ -82,11 +98,18 @@ main :: proc() {
 
 	for split in ([]string{"development", "holdout"}) {
 		if only != "" && only != split do continue
-		errs := make([dynamic]f64)
-		found, total, false_pos, scans := 0, 0, 0, 0
-		ms_total := 0.0
+		all := Tally{name = split}
+		groups := make([dynamic]Tally)
 		for s in ann.scans {
 			if s.split != split do continue
+			group := -1
+			if s.preset != "" {
+				for g, gi in groups do if g.name == s.preset do group = gi
+				if group < 0 {
+					append(&groups, Tally{name = s.preset})
+					group = len(groups) - 1
+				}
+			}
 			path, _ := os.join_path({os.args[2], s.image}, context.temp_allocator)
 			img := rl.LoadImage(fmt.ctprintf("%s", path))
 			if img.data == nil {
@@ -97,8 +120,7 @@ main :: proc() {
 			src := im.Image{int(img.width), int(img.height), ([^]u8)(img.data)[:img.width * img.height * 4]}
 			t := time.now()
 			cands := im.detect_cards(src)
-			ms_total += time.duration_milliseconds(time.since(t))
-			scans += 1
+			ms := time.duration_milliseconds(time.since(t))
 			fmt.sbprintf(&dump, "%s\n\"%s\": [", "," if dumped > 0 else "", s.id)
 			for c, ci in cands {
 				fmt.sbprintf(&dump, "%s{{\"source\": \"%v\", \"corners\": [", "," if ci > 0 else "", c.source)
@@ -120,27 +142,39 @@ main :: proc() {
 			used_p := make([]bool, len(cands), context.temp_allocator)
 			used_t := make([]bool, len(truth), context.temp_allocator)
 			matched := 0
+			scan_errs := make([dynamic]f64, context.temp_allocator)
 			for pr in pairs {
 				if pr.v < 0.35 || used_p[pr.p] || used_t[pr.t] do continue
 				used_p[pr.p], used_t[pr.t] = true, true
 				matched += 1
 				for k in 0 ..< 4 {
 					d := cands[pr.p].corners[k] - truth[pr.t][k]
-					append(&errs, math.sqrt(d.x * d.x + d.y * d.y))
+					append(&scan_errs, math.sqrt(d.x * d.x + d.y * d.y))
 				}
 			}
-			found += matched
-			total += len(truth)
-			false_pos += len(cands) - matched
-			fmt.printfln("  %-16s %d/%d found, %d false", s.id, matched, len(truth), len(cands) - matched)
+			tallies := [2]^Tally{&all, &groups[group] if group >= 0 else nil}
+			for tl in tallies {
+				if tl == nil do continue
+				tl.found += matched
+				tl.total += len(truth)
+				tl.false_pos += len(cands) - matched
+				tl.scans += 1
+				tl.ms += ms
+				for e in scan_errs do append(&tl.errs, e)
+			}
+			fmt.printfln("  %-26s %d/%d found, %d false, max error %.1f px, %.0f ms", s.id, matched, len(truth), len(cands) - matched, percentile(scan_errs[:], 100), ms)
 			delete(cands)
 			rl.UnloadImage(img)
 			free_all(context.temp_allocator)
 		}
-		if scans == 0 do continue
-		fmt.printfln("%-12s recall %d/%d  false %d  corner error median %.2f  p95 %.2f  max %.2f px  (%.0f ms/scan)",
-			split, found, total, false_pos, percentile(errs[:], 50), percentile(errs[:], 95), percentile(errs[:], 100), ms_total / f64(scans))
-		delete(errs)
+		if all.scans == 0 do continue
+		for &g in groups {
+			print_tally(&g)
+			delete(g.errs)
+		}
+		print_tally(&all)
+		delete(all.errs)
+		delete(groups)
 	}
 	if dump_path != "" {
 		fmt.sbprint(&dump, "\n}\n")
