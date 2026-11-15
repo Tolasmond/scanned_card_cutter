@@ -21,7 +21,11 @@ All builds use `-vet -strict-style`. A change is done when `./build.sh test` and
 
 ## Card detection
 
-`src/imaging/detect.odin` is a port of the original detector 1.5.0 (`workers/candidate_detector.py` in the old DragonRuby tool). Its constants and stages match the original. It reads only the original scan. Changing its behavior is a quality decision, so measure it first on the synthetic corpus (see "Synthetic scans" below) with `./build.sh bench` (development split while tuning, holdout only as the final check), and compare with the baseline in `README.md`. The synthetic tests in `detect_test.odin` come from the original suite and must keep passing. Detected cards with `source != .Full_Resolution_Edges` get `Region.review`, which is cleared when the user edits the card. Record/replay runs detection synchronously.
+`src/imaging/detect.odin` is a port of the original detector 1.5.0 (`workers/candidate_detector.py` in the old DragonRuby tool). The ported constants and stages match the original. Three stages were added on top and are not in the original: `detect_blocks.odin` (splits blocks of touching or overlapping cards at their rounded-corner notches and restores edges hidden under an overlapping card), `detect_frames.odin` (moves a card's sides from the artwork out to the faint real edge of a bed-coloured frame) and `suppress_artwork` in `detect.odin`. All of it reads only the original scan.
+
+Changing detection behavior is a quality decision, so measure it first on the synthetic corpus (see "Synthetic scans" below) with `./build.sh bench` (development split while tuning, holdout only as the final check), and compare with the baseline in `README.md`. `bench` prints one line per preset, so check the preset your change targets and the others for regressions. The synthetic tests in `detect_test.odin` come from the original suite, and `detect_blocks_test.odin` covers the additions; both must keep passing.
+
+**A guess must ask for a check.** Detected cards with `source != .Full_Resolution_Edges` get `Region.review`, which is cleared when the user edits the card. Any stage that infers a side rather than measuring it (a seam between touching cards, a size taken from other cards, a faint edge) must return such a source. Record/replay runs detection synchronously.
 
 ## Synthetic scans
 

@@ -33,13 +33,21 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 
 ### Card detection
 
-**Detect cards** is a pure-Odin port of the original tool's classical detector (`src/imaging/detect.odin`, ported from detector 1.5.0). It reads the original scan, never the moiré-filtered copy. It finds the scanner-bed color along the border and builds foreground masks from color distance and Canny edges. It removes scanner-lid strips, carves the thin gaps between tightly packed cards, and turns the outlines into four-corner proposals. It then fits each side to the card's outer edge at full resolution, splits outlines that are grids of touching rounded cards, and fills holes in a regular layout. About 0.3 s per 2550 x 3507 scan.
+**Detect cards** is a pure-Odin port of the original tool's classical detector (`src/imaging/detect.odin`, ported from detector 1.5.0), with three stages added to it. It reads the original scan, never the moiré-filtered copy. About 0.3 s per 2550 x 3507 scan.
 
-Each detected card becomes an ordinary editable card. Cards whose edges were fitted at full resolution are trusted. Grid splits, layout guesses and coarse outlines are marked *review* (pink) and need a check. Detection never replaces cards you already have; it only adds cards that don't overlap them.
+The port finds the scanner-bed color along the border and builds foreground masks from color distance and Canny edges. It removes scanner-lid strips, carves the thin gaps between tightly packed cards, and turns the outlines into four-corner proposals. It then fits each side to the card's outer edge at full resolution, splits outlines that are grids of touching rounded cards of a known size, and fills holes in a regular layout.
 
-During development the port was checked against the original detector on private scans of tightly packed rounded cards with hand-corrected corners. It found every card, made the same single false proposal as the original, and matched its corner accuracy: a typical corner error of about 6 px, with the largest errors on touching cards whose shared seam shows no edge. Those are the cards marked *review*.
+The added stages cover what the original could not:
 
-`./build.sh bench ANNOTATIONS.json IMAGE_DIR` scores detection against any annotation file in the format of `tools/detect_bench`.
+- **Blocks of touching or overlapping cards** (`detect_blocks.odin`). Rounded cards that touch leave a notch in the block's outline where two corners meet, and a small pocket of scanner bed where four meet. The block is split along the lines from notch to notch, so no card has to lie on its own to show the card size. Each seam is then fitted to the edge the image shows there. Where one card lies over another, the lower card's edge is hidden: if the cards of the block agree on a size, the hidden edge is placed by that size.
+- **Frames in the color of the scanner bed** (`detect_frames.odin`). A white frame on a white lid is background to the color masks, so the first fit ends at the artwork. The card's real edge still shows as a faint step or shadow line. It is found by averaging along each side, and accepted only when all four sides show one.
+- **Artwork taken for a card.** When most cards on the scan share a size, a proposal inside one of them that is not of that size is dropped.
+
+Each detected card becomes an ordinary editable card. Cards whose edges were fitted at full resolution are trusted. Everything that involves a guess is marked *review* (pink) and needs a check: block and grid splits, edges placed by size, faint outer edges, layout guesses and coarse outlines. Detection never replaces cards you already have; it only adds cards that don't overlap them.
+
+During development the port was checked against the original detector on private scans of tightly packed rounded cards with hand-corrected corners. It found every card, made the same single false proposal as the original, and matched its corner accuracy: a typical corner error of about 6 px, with the largest errors (up to 36 px) on touching cards whose shared seam was placed by the grid alone. With the block stage those seams are fitted, and on the same scans the typical error is about 5 px and the largest 21 px.
+
+`./build.sh bench ANNOTATIONS.json IMAGE_DIR` scores detection against any annotation file in the format of `tools/detect_bench`. When the scans name a preset, it prints one line per preset before each split's total.
 
 ### Moiré removal
 
@@ -120,29 +128,38 @@ Baseline (2 scans per preset per split, 2026-11-15):
 
 | Detection | Recall | False proposals | Median corner error | P95 |
 | --- | ---: | ---: | ---: | ---: |
-| `separated` | 24/24 | 3 | 2.2 px | 4.6 px |
+| `separated` | 24/24 | 0 | 2.2 px | 4.6 px |
 | `rotated` | 16/16 | 0 | 2.2 px | 3.7 px |
-| `poker_packed` | 36/36 | 1 | 4.8 px | 26.8 px |
-| `packed` | 19/24 | 1 | 6.1 px | 24.7 px |
-| `overlap` | 13/24 | 1 | 16.5 px | 32.8 px |
-| `pale` | 36/36 | 0 | 52.8 px | 61.5 px |
-| **development** | 66/80 | 5 | 4.7 px | 60.0 px |
-| **holdout** | 78/80 | 1 | 7.6 px | 61.1 px |
+| `poker_packed` | 36/36 | 0 | 1.7 px | 5.3 px |
+| `packed` | 24/24 | 0 | 1.7 px | 22.2 px |
+| `overlap` | 24/24 | 0 | 2.4 px | 7.1 px |
+| `pale` | 36/36 | 0 | 1.0 px | 3.1 px |
+| **development** | 80/80 | 0 | 1.6 px | 4.2 px |
+| **holdout** | 80/80 | 0 | 1.8 px | 6.6 px |
+
+The port alone, before the block, frame and artwork stages, scored 66/80 with 5 false proposals on development (median 4.7 px, P95 60.0 px) and 78/80 with 1 on holdout (median 7.6 px, P95 61.1 px). It merged overlapping cards into one outline (`overlap` 13/24), left blocks of touching cards whole when no single card showed the card size (`packed` 19/24), and put every corner of a white-framed card on the art window, about 50 px inside the card (`pale` median 52.8 px).
 
 | Moiré removal (PSNR against the clean twin, card interiors) | Raw scan | Filtered | Gain |
 | --- | ---: | ---: | ---: |
 | development | 32.18 dB | 38.95 dB | +6.77 dB |
 | holdout | 32.28 dB | 38.87 dB | +6.60 dB |
 
-The corpus shows the detector's known weak spots, inherited from the original. Overlapping cards merge into one outline. A block of touching cards stays merged when no single card shows the card size to split it by. On white-framed cards the frame is indistinguishable from the white lid, so every corner lands on the art window, about 50 px inside the card. The false proposals in `separated` are artwork on pale frames. On simple layouts the detector is accurate to about 2 px.
+What remains weak:
 
-The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_small` preset: three cards at 150 dpi, with a pair close enough to need the grid split.
+- **A hidden edge is a guess.** The edge of a card under another card is placed by the card size, to within a few pixels at best. Without a second card to confirm the size it stays at the upper card's edge. `overlap` has the largest typical error for this reason, and such cards are marked *review*.
+- **Seams need rounded corners.** Blocks are split at the notches that rounded corners leave. Square-cornered cards that touch, and cards overlapping so far that no notch is left at either end of a seam, stay merged unless another card shows the card size for the original grid split.
+- **Shadow sides.** The lamp shadow beside a card has the brightness of a pale frame, so a faint outer edge on the shadow side can land 2 to 4 px outside the card.
+- **Rare outliers.** One holdout `packed` scan has corners about 25 px off (its P95), and one `rotated` scan in a larger development run keeps a card on its art window on three sides. Both also fail in the plain port.
+
+On simple layouts the detector is accurate to about 2 px.
+
+The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_small` preset: three cards at 150 dpi, with a touching pair that has to be split.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), card detection (`detect.odin`, with `morph.odin` for masks/Canny and `contours.odin` for contours and geometry), multithreaded row helper. Unit tested. |
+| `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), card detection (`detect.odin`, with `detect_blocks.odin` for touching and overlapping cards, `detect_frames.odin` for bed-colored frames, `morph.odin` for masks/Canny and `contours.odin` for contours and geometry), multithreaded row helper. Unit tested. |
 | `tools/detect_bench/` | Detection benchmark against annotated corners (`./build.sh bench ANN DIR`) |
 | `tools/synth/` | Synthetic printed-and-scanned card generator with exact ground truth (`./build.sh synth DIR`) |
 | `tools/moire_bench/` | Moiré removal score against the clean twins (`./build.sh moire-bench DIR`) |
