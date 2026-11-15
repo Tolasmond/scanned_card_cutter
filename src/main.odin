@@ -7,7 +7,7 @@ import "core:strings"
 import im "imaging"
 import rl "vendor:raylib"
 
-CORNER_HIT :: 12 // screen px at 1x
+CORNER_HIT :: 16 // grab radius around a corner, screen px at 1x
 
 main :: proc() {
 	opts, ok := parse_args(os.args[1:])
@@ -339,7 +339,7 @@ draw_scene :: proc(app: ^App, v: View) {
 		rl.DrawLineEx(pts[0], pts[1], S(4) if sel else S(3), COLOR_TOP) // card's top edge
 		for c in 0 ..< 4 {
 			focused := sel && c == app.focused_corner
-			s := S(10) if focused else S(7)
+			s := S(13) if focused else S(9)
 			rl.DrawRectangleV(pts[c] - s / 2, {s, s}, rl.WHITE if focused else col)
 			rl.DrawRectangleLinesEx({pts[c].x - s / 2, pts[c].y - s / 2, s, s}, max(1, S(1)), rl.BLACK)
 		}
