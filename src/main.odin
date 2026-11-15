@@ -325,7 +325,7 @@ COLOR_SELECTED :: rl.Color{255, 220, 60, 255}
 COLOR_TOP :: rl.Color{255, 120, 40, 255}
 COLOR_REVIEW :: rl.Color{255, 90, 200, 255} // detected with medium confidence
 
-draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
+draw_scene :: proc(app: ^App, v: View) {
 	dest := rl.Rectangle{v.offset.x, v.offset.y, f32(app.scan.width) * v.zoom, f32(app.scan.height) * v.zoom}
 	// Always the original scan: corners are placed on unfiltered pixels.
 	rl.DrawTexturePro(app.tex, {0, 0, f32(app.tex.width), f32(app.tex.height)}, dest, {}, 0, rl.WHITE)
@@ -343,14 +343,13 @@ draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 			rl.DrawRectangleV(pts[c] - s / 2, {s, s}, rl.WHITE if focused else col)
 			rl.DrawRectangleLinesEx({pts[c].x - s / 2, pts[c].y - s / 2, s, s}, max(1, S(1)), rl.BLACK)
 		}
-		if show_labels {
-			center := (pts[0] + pts[1] + pts[2] + pts[3]) / 4
-			label := fmt.ctprintf("%d", i + 1)
-			tw := measure_big_text(label)
-			rl.DrawRectangleRounded({center.x - tw / 2 - S(10), center.y - S(26), tw + S(20), S(52)}, 0.3, 6, {0, 0, 0, 160})
-			// Inter's digits span 0.24-0.97 em below the line top; center that band.
-			draw_big_text(label, i32(center.x - tw / 2), i32(center.y - 0.605 * f32(fonts.big_size)), col)
-		}
+		// Card number at the centre.
+		center := (pts[0] + pts[1] + pts[2] + pts[3]) / 4
+		label := fmt.ctprintf("%d", i + 1)
+		tw := measure_big_text(label)
+		rl.DrawRectangleRounded({center.x - tw / 2 - S(10), center.y - S(26), tw + S(20), S(52)}, 0.3, 6, {0, 0, 0, 160})
+		// Inter's digits span 0.24-0.97 em below the line top; center that band.
+		draw_big_text(label, i32(center.x - tw / 2), i32(center.y - 0.605 * f32(fonts.big_size)), col)
 	}
 	// Points placed so far for a new card, with a rubber band to the mouse.
 	if app.placing {
@@ -379,38 +378,8 @@ draw_canvas :: proc(app: ^App) {
 		rl.SetTextureFilter(app.tex, want)
 	}
 	rl.BeginScissorMode(i32(canvas.x), i32(canvas.y), i32(canvas.width), i32(canvas.height))
-	draw_scene(app, app.view, true)
+	draw_scene(app, app.view)
 	rl.EndScissorMode()
-	draw_loupe(app)
-}
-
-// Magnifier near the cursor while dragging a corner or placing points.
-draw_loupe :: proc(app: ^App) {
-	if !(app.drag == .Corner || app.placing) do return
-	mouse := rl.GetMousePosition()
-	canvas := canvas_rect()
-	if !rl.CheckCollisionPointRec(mouse, canvas) do return
-	SIZE := S(220)
-	off := S(30)
-	focus := to_source(app.view, mouse)
-	if app.drag == .Corner do focus = app.regions[app.selected].corners[app.drag_corner]
-	zoom := max(app.view.zoom * 6, 4)
-	box := rl.Rectangle{mouse.x + off, mouse.y + off, SIZE, SIZE}
-	if box.x + SIZE > canvas.x + canvas.width do box.x = mouse.x - off - SIZE
-	if box.y + SIZE > canvas.y + canvas.height do box.y = mouse.y - off - SIZE
-	center := rl.Vector2{box.x + SIZE / 2, box.y + SIZE / 2}
-	v := View{zoom = zoom, offset = center - rl.Vector2{f32(focus.x), f32(focus.y)} * zoom}
-	prev := app.tex_filter
-	rl.SetTextureFilter(app.tex, .POINT)
-	rl.BeginScissorMode(i32(box.x), i32(box.y), i32(SIZE), i32(SIZE))
-	rl.DrawRectangleRec(box, rl.BLACK)
-	draw_scene(app, v, false)
-	arm := S(12)
-	rl.DrawLineEx({center.x - arm, center.y}, {center.x + arm, center.y}, max(1, S(1)), rl.MAGENTA)
-	rl.DrawLineEx({center.x, center.y - arm}, {center.x, center.y + arm}, max(1, S(1)), rl.MAGENTA)
-	rl.EndScissorMode()
-	rl.SetTextureFilter(app.tex, prev)
-	rl.DrawRectangleLinesEx(box, S(2), rl.WHITE)
 }
 
 draw_checker :: proc(r: rl.Rectangle) {

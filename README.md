@@ -5,7 +5,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 ## Workflow
 
 1. **Open a scan.** Use *Open scan…* (Ctrl+O), copy the PNG in your file manager and press **Ctrl+V** in the app, drop a PNG on the window, or pass the path as an argument.
-2. **Mark the cards.** Press **D** (*Detect cards*) to find them automatically, or press **A** and click a card's 4 corners in any order. A magnifier appears while you click or drag. The orange edge marks the card's top; press **R** to rotate it. Detected cards the detector is unsure of are drawn pink and marked *review* until you adjust them.
+2. **Mark the cards.** Press **D** (*Detect cards*) to find them automatically, or press **A** and click a card's 4 corners in any order. The orange edge marks the card's top; press **R** to rotate it. Detected cards the detector is unsure of are drawn pink and marked *review* until you adjust them.
 3. **Adjust.** Drag corners or whole cards, or nudge them with the arrow keys. The preview shows the exact export output and updates as you edit. **P** opens it at full size.
 4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels). Tick **Remove moiré** (M) to filter out the printed halftone pattern (see below).
 5. **Export** (Ctrl+E). Each card is written as `<prefix>_NN.png` to the chosen folder. Pasting (Ctrl+V) or dropping a folder sets the output folder.
@@ -147,7 +147,7 @@ The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_
 | `tools/synth/` | Synthetic printed-and-scanned card generator with exact ground truth (`./build.sh synth DIR`) |
 | `tools/moire_bench/` | Moiré removal score against the clean twins (`./build.sh moire-bench DIR`) |
 | `src/app.odin` | Application state, scan loading, card editing, preview, export requests |
-| `src/main.odin` | Window loop, canvas input and drawing, magnifier, full-size preview |
+| `src/main.odin` | Window loop, canvas input and drawing, full-size preview |
 | `src/panel.odin` | Side panel UI |
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
 | `src/detection.odin` | Runs detection in the background and adds the results as cards |
