@@ -219,6 +219,23 @@ fit_view_to :: proc(v: ^View, rect: rl.Rectangle, w, h: f32, max_zoom: f32 = 64)
 	v.offset = {rect.x + (rect.width - w * v.zoom) / 2, rect.y + (rect.height - h * v.zoom) / 2}
 }
 
+BIG_INFO_H :: 32 // the full preview's info bar across the top of the canvas, at 1x
+BIG_PAD :: 16 // space around the card when the full preview fits it, at 1x
+
+// Fits the full preview's card to the canvas below the info bar, as large as
+// it goes (scaling small cards up) with a little padding, centered.
+fit_big_preview :: proc(app: ^App) {
+	if app.big_tex.id == 0 do return
+	c := canvas_rect()
+	top := S(BIG_INFO_H)
+	p := S(BIG_PAD)
+	area := rl.Rectangle{c.x + p, c.y + top + p, c.width - 2 * p, c.height - top - 2 * p}
+	w, h := f32(app.big_tex.width), f32(app.big_tex.height)
+	v := &app.big_view
+	v.zoom = clamp(min(area.width / w, area.height / h), 0.05, 16) // the wheel's zoom range
+	v.offset = {area.x + (area.width - w * v.zoom) / 2, area.y + (area.height - h * v.zoom) / 2}
+}
+
 fit_view :: proc(app: ^App) {
 	if has_scan(app) do fit_view_to(&app.view, canvas_rect(), f32(app.scan.width), f32(app.scan.height))
 	app.view_touched = false
@@ -375,7 +392,7 @@ update_previews :: proc(app: ^App) {
 		first := app.big_tex.id == 0
 		render_card_texture(app, &app.big_tex, 1)
 		app.big_dirty = false
-		if first && app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas_rect(), f32(app.big_tex.width), f32(app.big_tex.height), 1)
+		if first do fit_big_preview(app)
 	}
 }
 

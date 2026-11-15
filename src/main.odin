@@ -54,7 +54,7 @@ main :: proc() {
 		if ui_scale_update(&app.ui) do on_ui_scale_changed(&app)
 		if rl.IsWindowResized() {
 			if !app.view_touched do fit_view(&app)
-			if app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas_rect(), f32(app.big_tex.width), f32(app.big_tex.height), 1)
+			fit_big_preview(&app)
 		}
 		modal := app.browser.active || app.confirm_count > 0
 		if !modal {
@@ -90,7 +90,7 @@ main :: proc() {
 on_ui_scale_changed :: proc(app: ^App) {
 	if !app.view_touched do fit_view(app)
 	mark_preview_dirty(app)
-	if app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas_rect(), f32(app.big_tex.width), f32(app.big_tex.height), 1)
+	fit_big_preview(app)
 	mode := "manual" if app.ui.manual > 0 else "auto"
 	set_status(app, false, "Interface scale %.1fx (%s). Ctrl+= / Ctrl+- to change, Ctrl+0 for auto.", ui_scale, mode)
 }
@@ -314,7 +314,7 @@ handle_big_preview_input :: proc(app: ^App) {
 		app.big_view.zoom = 1
 		app.big_view.offset = {canvas.x + (canvas.width - f32(app.big_tex.width)) / 2, canvas.y + (canvas.height - f32(app.big_tex.height)) / 2}
 	}
-	if rl.IsKeyPressed(.F) && app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas, f32(app.big_tex.width), f32(app.big_tex.height), 1)
+	if rl.IsKeyPressed(.F) do fit_big_preview(app)
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +408,7 @@ draw_big_preview :: proc(app: ^App) {
 	rl.DrawTexturePro(app.big_tex, {0, 0, f32(app.big_tex.width), f32(app.big_tex.height)}, {v.offset.x, v.offset.y, f32(app.big_tex.width) * v.zoom, f32(app.big_tex.height) * v.zoom}, {}, 0, rl.WHITE)
 	rl.EndScissorMode()
 	info := rl.TextFormat("Card %d at export size %d × %d, zoom %.0f%%. Wheel zooms, drag pans, 1 = 100%%, F = fit, P/Esc closes.", app.selected + 1, app.big_tex.width, app.big_tex.height, v.zoom * 100)
-	rl.DrawRectangle(0, 0, i32(canvas.width), i32(S(32)), {0, 0, 0, 170})
+	rl.DrawRectangle(0, 0, i32(canvas.width), i32(S(BIG_INFO_H)), {0, 0, 0, 170})
 	draw_text(info, i32(S(10)), i32(S(6)), rl.WHITE)
 }
 
