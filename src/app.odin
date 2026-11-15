@@ -42,7 +42,11 @@ App :: struct {
 	clean_job:       ^Clean_Job,
 	sync_jobs:       bool, // record/replay: run background jobs inline
 	detect_job:      ^Detect_Job,
-	scan_path:       string,
+	scan_path:       string, // just the file name for a scan made with a scanner profile
+	scanners:        [dynamic]Scanner_Profile, // from scanners.ini
+	scanner_index:   int, // chosen profile
+	scan_job:        ^Scan_Job,
+	scanning_allowed: bool, // off in record/replay: a scanner isn't reproducible
 	tex:             rl.Texture2D, // possibly downscaled for the GPU
 	tex_filter:      rl.TextureFilter,
 	view:            View,
@@ -153,7 +157,9 @@ unload_scan :: proc(app: ^App) {
 	mark_preview_dirty(app)
 }
 
-load_scan :: proc(app: ^App, path: string) -> bool {
+// Opens a PNG as the scan. A temporary one (from a scanner profile) is about
+// to be deleted: keep only its name, and don't make its folder the output.
+load_scan :: proc(app: ^App, path: string, temporary := false) -> bool {
 	if app.job != nil {
 		set_status(app, true, "Wait for the export to finish before opening another scan.")
 		return false
@@ -180,9 +186,9 @@ load_scan :: proc(app: ^App, path: string) -> bool {
 	rl.SetTextureFilter(app.tex, app.tex_filter)
 
 	delete(app.scan_path)
-	app.scan_path = strings.clone(path)
+	app.scan_path = strings.clone(os.base(path) if temporary else path)
 	buf_set(app.prefix[:], os.stem(path))
-	if buf_string(app.out_dir[:]) == "" do buf_set(app.out_dir[:], os.dir(path))
+	if !temporary && buf_string(app.out_dir[:]) == "" do buf_set(app.out_dir[:], os.dir(path))
 	fit_view(app)
 	set_status(app, false, "Opened %s (%d x %d). Press A to add a card, then click its 4 corners.", os.base(path), img.width, img.height)
 	if app.moire do start_cleaning(app)

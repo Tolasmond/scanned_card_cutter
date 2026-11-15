@@ -4,7 +4,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 
 ## Workflow
 
-1. **Open a scan.** Use *Open scan…* (Ctrl+O), copy the PNG in your file manager and press **Ctrl+V** in the app, drop a PNG on the window, or pass the path as an argument.
+1. **Open a scan.** Use *Open…* (Ctrl+O), copy the PNG in your file manager and press **Ctrl+V** in the app, drop a PNG on the window, or pass the path as an argument. Or **Scan** (Ctrl+N) straight into the app with a scanner you have set up (see *Scanning* below).
 2. **Mark the cards.** Press **D** (*Detect cards*) to find them automatically, or press **A** and click a card's 4 corners in any order. The orange edge marks the card's top; press **R** to rotate it. Detected cards the detector is unsure of are drawn pink and marked *review* until you adjust them.
 3. **Adjust.** Drag corners or whole cards, or nudge them with the arrow keys. The preview shows the exact export output and updates as you edit. **P** opens it at full size.
 4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels). Tick **Remove moiré** (M) to filter out the printed halftone pattern (see below).
@@ -33,8 +33,38 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
 | M | Moiré removal on/off |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
+| Ctrl+N / Scan button | Scan with the chosen scanner profile (the button cancels a running scan) |
 | Ctrl+V | Paste a file copied in a file manager: a PNG opens as the scan, a folder becomes the output folder |
 | Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |
+
+### Scanning
+
+**Scan** runs a command you set up that writes a PNG, opens the PNG as the scan and deletes the file. The app has no scanner drivers of its own: any program that can scan to a PNG works, so each scanner, driver or platform is a few lines of configuration rather than code. The profiles live in `scanners.ini` in your config folder:
+
+| OS | File |
+| --- | --- |
+| Linux | `~/.config/scan_tool/scanners.ini` (or under `$XDG_CONFIG_HOME`) |
+| macOS | `~/Library/Application Support/scan_tool/scanners.ini` |
+| Windows | `%APPDATA%\scan_tool\scanners.ini` |
+
+Pressing *Scan* before the file exists writes it with commented-out examples. Each section is one profile:
+
+```ini
+[Flatbed 300 dpi]
+command = scanimage --source Flatbed --mode Color --resolution 300 --format=png -o {out}
+
+[Flatbed 600 dpi]
+command = scanimage --source Flatbed --mode Color --resolution 600 --format=png -o {out}
+```
+
+- **`{out}`** is where the command must write the PNG: a new file in a temporary folder, removed after the scan opens. It can be part of an argument (`--output={out}`).
+- **The command runs directly, not through a shell.** It is split into arguments at spaces, and `"..."` or `'...'` group an argument that contains spaces. There are no backslash escapes, so Windows paths work as written. For pipes or several steps, point the command at a script.
+- **Choosing a profile.** With more than one profile a *Scanner* selector appears under the Scan button; click it or press Enter on it to step through them. The file is read again on every scan, so edits apply without restarting.
+- **While it runs** the status line says so, and the button becomes *Cancel scan*, which kills the command (not programs a script started). If the command fails, the status line shows its exit code and the last line it printed.
+- **The scan is not kept.** It is named after the time (`scan-20261115-170802.png`), which becomes the file prefix, so cards from scans made one after another get different names. The export folder is not changed: choose one before the first export.
+- **Scan at 300 dpi**: detection is tuned for it.
+- **White-bordered cards: cover them with a matte black sheet.** On the white lid a white border is almost invisible, and detection ends up on the printed frame inside it. Detection takes the scanner bed's colour from the edges of the scan, so the sheet must fill the whole glass out to every edge; glossy black reflects the lamp and comes out patchy. Cards with dark or coloured borders scan best on the plain lid.
+- Record and replay never scan: a replay must not depend on a scanner.
 
 ### Card detection
 
@@ -174,6 +204,7 @@ The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
 | `src/detection.odin` | Runs detection in the background and adds the results as cards |
 | `src/moire.odin` | Runs the moiré filter once per scan in the background; picks the cleaned or original pixels |
+| `src/scanner.odin` | Scan button: reads `scanners.ini`, runs the chosen profile's command in the background, opens its PNG |
 | `src/paste.odin` | Ctrl+V: parse clipboard paths (plain, `file://` URIs, GNOME copied files) |
 | `src/export.odin` | Background export thread and PNG writing |
 | `src/ui_scale.odin` | Interface scale: monitor detection, `S()`/`fs()` sizing helpers, scaled dialog frame |

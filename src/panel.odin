@@ -3,6 +3,7 @@ package main
 
 import "core:fmt"
 import "core:os"
+import "core:strings"
 import im "imaging"
 import rl "vendor:raylib"
 
@@ -68,10 +69,37 @@ draw_panel :: proc(app: ^App) {
 
 	// --- Scan ---------------------------------------------------------------
 	focus_begin_frame(app)
-	if busy do rl.GuiDisable()
-	if focus_button(app, .Open, {x, y, w, ROW + S(4)}, "#1#Open scan...  (Ctrl+O)") do open_scan_dialog(app)
+	// Open and Scan share a row, so the controls below stay where recordings click.
+	scanning := app.scan_job != nil
+	if busy || scanning do rl.GuiDisable()
+	if focus_button(app, .Open, {x, y, half, ROW + S(4)}, "#1#Open...  (Ctrl+O)") do open_scan_dialog(app)
+	rl.GuiEnable()
+	if !app.scanning_allowed || busy do rl.GuiDisable()
+	scan_label: cstring = "#113#Cancel scan" if scanning else "#183#Scan  (Ctrl+N)"
+	if focus_button(app, .Scan, {x + half + gap, y, half, ROW + S(4)}, scan_label) {
+		if scanning do cancel_scan(app)
+		else do start_scan(app)
+	}
 	rl.GuiEnable()
 	y += ROW + S(10)
+	// Several scanner profiles: pick one (click or Enter cycles through them).
+	if len(app.scanners) > 1 {
+		names := make([dynamic]string, context.temp_allocator)
+		for p in app.scanners {
+			n, _ := strings.replace_all(p.name, ";", ",", context.temp_allocator) // raygui separates items with ;
+			append(&names, n)
+		}
+		label_w := S(70)
+		rl.GuiLabel({x, y, label_w, ROW}, "Scanner")
+		box := rl.Rectangle{x + label_w, y, w - label_w, ROW}
+		if scanning do rl.GuiDisable()
+		active := i32(app.scanner_index)
+		rl.GuiComboBox(box, strings.clone_to_cstring(strings.join(names[:], ";", context.temp_allocator), context.temp_allocator), &active)
+		if focus_activated(app, focus_control(app, .Scanner, box)) do active = (active + 1) % i32(len(app.scanners))
+		rl.GuiEnable()
+		app.scanner_index = int(active)
+		y += ROW + S(6)
+	}
 	if has_scan(app) {
 		name := fmt.ctprintf("%s  (%d × %d)", os.base(app.scan_path), app.scan.width, app.scan.height)
 		rl.GuiLabel({x, y, w, S(22)}, name)

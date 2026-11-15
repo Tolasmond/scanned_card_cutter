@@ -5,6 +5,7 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 ## Ground rules
 
 - **Only what ships with Odin.** Use `core:` and `vendor:raylib`/raygui. Don't add third-party libraries, Python, ImageMagick or any other external program to the app or its build. Image algorithms belong in `src/imaging/` as pure Odin, with unit tests. The one bundled third-party file is the Inter font in `assets/fonts/` (SIL OFL 1.1, license alongside), compiled in with `#load`. It is data, not code. Don't load fonts from the system.
+- **One exception: the user's scanner command.** *Scan* runs a command the user writes in `scanners.ini` (`src/scanner.odin`). Nothing ships with the app or depends on it, and without the file the app is unchanged. Keep it that way: don't bundle, require or default to any scanning program, and add support for another scanner as an example profile, not code.
 - **Cross-platform.** The app must keep building on Windows, macOS and Linux. The record/replay harness uses only raylib, so it should work on all three; so far it has only been run on Linux.
 - **Keep the workflow simple:** one scan per session. There are no projects, autosave or export history, by design.
 

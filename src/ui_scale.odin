@@ -26,6 +26,7 @@ Ui_Scale_State :: struct {
 	// raygui's per-control 1x values, so every scale is computed from the same base.
 	base_padding: [rl.GuiControl]i32,
 	base_border:  [rl.GuiControl]i32,
+	base_combo:   [2]i32, // combo box selector button width and spacing
 }
 
 // Scales a 1x layout size.
@@ -71,6 +72,10 @@ ui_scale_init :: proc(st: ^Ui_Scale_State, fixed: bool) {
 		st.base_padding[c] = rl.GuiGetStyle(c, i32(rl.GuiControlProperty.TEXT_PADDING))
 		st.base_border[c] = rl.GuiGetStyle(c, i32(rl.GuiControlProperty.BORDER_WIDTH))
 	}
+	st.base_combo = {
+		rl.GuiGetStyle(.COMBOBOX, i32(rl.GuiComboBoxProperty.COMBO_BUTTON_WIDTH)),
+		rl.GuiGetStyle(.COMBOBOX, i32(rl.GuiComboBoxProperty.COMBO_BUTTON_SPACING)),
+	}
 	st.monitor = rl.GetCurrentMonitor()
 	ui_apply_scale(st, 1 if fixed else detect_ui_scale())
 }
@@ -85,6 +90,8 @@ ui_apply_scale :: proc(st: ^Ui_Scale_State, s: f32) {
 		rl.GuiSetStyle(c, i32(rl.GuiControlProperty.TEXT_PADDING), i32(math.round(f32(st.base_padding[c]) * s)))
 		rl.GuiSetStyle(c, i32(rl.GuiControlProperty.BORDER_WIDTH), i32(math.round(f32(st.base_border[c]) * s)))
 	}
+	rl.GuiSetStyle(.COMBOBOX, i32(rl.GuiComboBoxProperty.COMBO_BUTTON_WIDTH), i32(math.round(f32(st.base_combo[0]) * s)))
+	rl.GuiSetStyle(.COMBOBOX, i32(rl.GuiComboBoxProperty.COMBO_BUTTON_SPACING), i32(math.round(f32(st.base_combo[1]) * s)))
 	rl.GuiSetIconScale(max(1, i32(s)))
 	fonts_update()
 }

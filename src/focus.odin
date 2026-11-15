@@ -8,6 +8,8 @@ import rl "vendor:raylib"
 Focus :: enum {
 	None,
 	Open,
+	Scan,
+	Scanner,
 	Width,
 	Height,
 	Radius,

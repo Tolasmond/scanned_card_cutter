@@ -35,6 +35,8 @@ main :: proc() {
 		radius         = 36,
 	}
 	app.sync_jobs = h.mode != .Off
+	app.scanning_allowed = h.mode == .Off
+	if app.scanning_allowed do load_scanners(&app)
 	// Record/replay keep a 1x layout: recorded clicks are window pixels.
 	ui_scale_init(&app.ui, h.mode != .Off)
 	if h.mode == .Off && ui_scale != 1 do ui_size_window(f32(win_w), f32(win_h))
@@ -51,6 +53,7 @@ main :: proc() {
 		poll_export(&app)
 		poll_cleaning(&app)
 		poll_detection(&app)
+		poll_scan(&app)
 		handle_drops(&app)
 		if ui_scale_update(&app.ui) do on_ui_scale_changed(&app)
 		if rl.IsWindowResized() {
@@ -81,6 +84,8 @@ main :: proc() {
 		rl.EndDrawing()
 	}
 	if app.job != nil do export_destroy(app.job) // waits for the worker
+	discard_scan(&app)
+	delete_scanners(&app.scanners)
 	harness_finish(&h, &app)
 	unload_scan(&app)
 	fonts_unload()
@@ -137,6 +142,7 @@ handle_keys :: proc(app: ^App) {
 	if ctrl && rl.IsKeyPressed(.Q) do app.quit = true
 	if ctrl && rl.IsKeyPressed(.V) do paste_from_clipboard(app)
 	if ctrl && rl.IsKeyPressed(.O) do open_scan_dialog(app)
+	if ctrl && rl.IsKeyPressed(.N) do start_scan(app)
 	if ctrl && rl.IsKeyPressed(.E) do request_export(app)
 	if !has_scan(app) do return
 
@@ -152,7 +158,7 @@ handle_keys :: proc(app: ^App) {
 	if rl.IsKeyPressed(.P) || rl.IsKeyPressed(.SPACE) do toggle_big_preview(app)
 	if app.big_open do return
 
-	if rl.IsKeyPressed(.A) || rl.IsKeyPressed(.N) do start_placing(app)
+	if !ctrl && (rl.IsKeyPressed(.A) || rl.IsKeyPressed(.N)) do start_placing(app)
 	if rl.IsKeyPressed(.M) do set_moire(app, !app.moire)
 	if rl.IsKeyPressed(.D) do start_detection(app)
 	if rl.IsKeyPressed(.F) do fit_view(app)
@@ -205,9 +211,11 @@ start_placing :: proc(app: ^App) {
 }
 
 open_scan_dialog :: proc(app: ^App) {
-	if app.job != nil do return
+	if app.job != nil || app.scan_job != nil do return
 	app.browser_purpose = .Scan
-	browser_open(&app.browser, .Open_File, "Open scan (PNG)", os.dir(app.scan_path) if app.scan_path != "" else "")
+	// A scanned scan's path is just its name: its temporary folder is gone.
+	start := os.dir(app.scan_path) if app.scan_path != "" && os.dir(app.scan_path) != "." else ""
+	browser_open(&app.browser, .Open_File, "Open scan (PNG)", start)
 }
 
 open_folder_dialog :: proc(app: ^App) {
