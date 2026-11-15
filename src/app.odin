@@ -8,13 +8,8 @@ import "core:strings"
 import im "imaging"
 import rl "vendor:raylib"
 
-PANEL_W :: 380
-STATUS_H :: 32
-PAD :: 12
-ROW :: 30
 MAX_TEXTURE_DIM :: 8192
-PREVIEW_MAX_W :: PANEL_W - PAD * 2
-PREVIEW_MAX_H :: 420
+PREVIEW_MAX_H :: 420 // at 1x; the panel width limits the other side
 
 View :: struct {
 	zoom:   f32, // screen pixels per image pixel
@@ -64,6 +59,7 @@ App :: struct {
 	out_w, out_h:    i32,
 	radius, trim:    i32,
 	edit_field:      int, // which value box is in edit mode (0 = none)
+	panel_scroll:    f32, // side panel scroll offset when the window is too short
 	out_dir:         [1024]u8,
 	prefix:          [256]u8,
 
@@ -83,6 +79,7 @@ App :: struct {
 	job:             ^Export_Job,
 	confirm_count:   int, // > 0 while asking to overwrite this many files
 	typing:          bool, // a text box has keyboard focus this frame
+	ui:              Ui_Scale_State,
 
 	status:          [512]u8,
 	status_len:      int,
@@ -193,7 +190,7 @@ load_scan :: proc(app: ^App, path: string) -> bool {
 // ---------------------------------------------------------------------------
 
 canvas_rect :: proc() -> rl.Rectangle {
-	return {0, 0, f32(rl.GetScreenWidth() - PANEL_W), f32(rl.GetScreenHeight() - STATUS_H)}
+	return {0, 0, f32(rl.GetScreenWidth()) - panel_w, f32(rl.GetScreenHeight()) - status_h}
 }
 
 fit_view_to :: proc(v: ^View, rect: rl.Rectangle, w, h: f32, max_zoom: f32 = 64) {
@@ -341,7 +338,7 @@ update_previews :: proc(app: ^App) {
 	now := rl.GetTime()
 	dragging := app.drag == .Corner || app.drag == .Body
 	if app.preview_dirty && (!dragging || now - app.preview_time > 0.08) {
-		scale := min(f64(PREVIEW_MAX_W) / f64(max(app.out_w, 1)), f64(PREVIEW_MAX_H) / f64(max(app.out_h, 1)), 1)
+		scale := min(f64(panel_w - pad * 2) / f64(max(app.out_w, 1)), f64(S(PREVIEW_MAX_H)) / f64(max(app.out_h, 1)), 1)
 		render_card_texture(app, &app.preview, scale)
 		app.preview_dirty = false
 		app.preview_time = now

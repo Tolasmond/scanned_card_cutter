@@ -4,7 +4,7 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 
 ## Ground rules
 
-- **Only what ships with Odin.** Use `core:` and `vendor:raylib`/raygui. Don't add third-party libraries, Python, ImageMagick or any other external program to the app or its build. Image algorithms belong in `src/imaging/` as pure Odin, with unit tests.
+- **Only what ships with Odin.** Use `core:` and `vendor:raylib`/raygui. Don't add third-party libraries, Python, ImageMagick or any other external program to the app or its build. Image algorithms belong in `src/imaging/` as pure Odin, with unit tests. The one bundled third-party file is the Inter font in `assets/fonts/` (SIL OFL 1.1, license alongside), compiled in with `#load`. It is data, not code. Don't load fonts from the system.
 - **Cross-platform.** The app must keep building on Windows, macOS and Linux. The record/replay harness uses only raylib, so it should work on all three; so far it has only been run on Linux.
 - **Keep the workflow simple:** one scan per session. There are no projects, autosave or export history, by design.
 
@@ -18,6 +18,10 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 ```
 
 All builds use `-vet -strict-style`. A change is done when `./build.sh test` and `./build.sh replay` both pass.
+
+## Interface scale
+
+All layout sizes are written for 1x and go through `S()` (sizes) and `fs()` (font sizes) in `src/ui_scale.odin`. New UI code must do the same. Draw text with `draw_text`/`measure_text` (or the `_big_` versions) from `src/fonts.odin`, not `rl.DrawText`, which uses raylib's built-in bitmap font. raygui controls already use Inter. Record and replay always run at 1x, so a 1x layout change moves the controls that recordings click. If a replay fails because of one, re-record the test rather than updating its expected results.
 
 ## The replay harness
 

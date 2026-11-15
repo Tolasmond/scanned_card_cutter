@@ -36,7 +36,7 @@ Browser :: struct {
 	has_result:   bool,
 }
 
-BROWSER_ROW :: 28
+BROWSER_ROW :: 28 // at 1x
 
 browser_open :: proc(b: ^Browser, mode: Browser_Mode, title: cstring, start_dir: string) {
 	b.active = true
@@ -137,23 +137,25 @@ browser_update_draw :: proc(b: ^Browser, typing: ^bool) -> bool {
 	sw, sh := f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())
 	rl.DrawRectangle(0, 0, i32(sw), i32(sh), {0, 0, 0, 140})
 
-	w := min(sw - 40, 900)
-	h := min(sh - 40, 700)
+	w := min(sw - S(40), S(900))
+	h := min(sh - S(40), S(700))
 	box := rl.Rectangle{(sw - w) / 2, (sh - h) / 2, w, h}
-	if rl.GuiWindowBox(box, b.title) != 0 {
+	content, closed := dialog_frame(box, b.title)
+	if closed {
 		browser_close(b)
 		return true
 	}
-	x := box.x + 12
-	y := box.y + 36
-	inner_w := box.width - 24
+	ROW := S(BROWSER_ROW)
+	x := box.x + S(12)
+	y := content.y + S(8)
+	inner_w := box.width - S(24)
 
 	// Path row: [Up] [Home] [path text box]
-	if rl.GuiButton({x, y, 70, 30}, "Up") do browser_up(b)
-	if rl.GuiButton({x + 78, y, 80, 30}, "Home") {
+	if rl.GuiButton({x, y, S(70), S(30)}, "Up") do browser_up(b)
+	if rl.GuiButton({x + S(78), y, S(80), S(30)}, "Home") {
 		if home, err := os.user_home_dir(context.temp_allocator); err == nil do browser_navigate(b, home)
 	}
-	if rl.GuiTextBox({x + 166, y, inner_w - 166, 30}, cstring(&b.path_buf[0]), i32(len(b.path_buf)), b.path_edit) {
+	if rl.GuiTextBox({x + S(166), y, inner_w - S(166), S(30)}, cstring(&b.path_buf[0]), i32(len(b.path_buf)), b.path_edit) {
 		b.path_edit = !b.path_edit
 		if !b.path_edit {
 			typed := string(cstring(&b.path_buf[0]))
@@ -164,31 +166,31 @@ browser_update_draw :: proc(b: ^Browser, typing: ^bool) -> bool {
 		}
 	}
 	typing^ = typing^ || b.path_edit
-	y += 40
+	y += S(40)
 
 	// File list
-	footer := f32(46)
-	list := rl.Rectangle{x, y, inner_w, box.y + box.height - footer - y - 8}
+	footer := S(46)
+	list := rl.Rectangle{x, y, inner_w, box.y + box.height - footer - y - S(8)}
 	rl.DrawRectangleRec(list, rl.RAYWHITE)
-	rl.DrawRectangleLinesEx(list, 1, rl.GRAY)
+	rl.DrawRectangleLinesEx(list, max(1, S(1)), rl.GRAY)
 	mouse := rl.GetMousePosition()
-	content_h := f32(len(b.entries)) * BROWSER_ROW
-	if rl.CheckCollisionPointRec(mouse, list) do b.scroll -= rl.GetMouseWheelMove() * BROWSER_ROW * 3
+	content_h := f32(len(b.entries)) * ROW
+	if rl.CheckCollisionPointRec(mouse, list) do b.scroll -= rl.GetMouseWheelMove() * ROW * 3
 	b.scroll = clamp(b.scroll, 0, max(0, content_h - list.height))
 
 	rl.BeginScissorMode(i32(list.x), i32(list.y), i32(list.width), i32(list.height))
-	first := int(b.scroll / BROWSER_ROW)
+	first := int(b.scroll / ROW)
 	for i := first; i < len(b.entries); i += 1 {
-		ry := list.y + f32(i) * BROWSER_ROW - b.scroll
+		ry := list.y + f32(i) * ROW - b.scroll
 		if ry > list.y + list.height do break
-		row := rl.Rectangle{list.x + 1, ry, list.width - 2, BROWSER_ROW}
+		row := rl.Rectangle{list.x + 1, ry, list.width - 2, ROW}
 		hover := rl.CheckCollisionPointRec(mouse, row) && rl.CheckCollisionPointRec(mouse, list)
 		if i == b.selected do rl.DrawRectangleRec(row, {151, 232, 255, 255})
 		else if hover do rl.DrawRectangleRec(row, {230, 240, 250, 255})
 		e := b.entries[i]
 		icon := rl.GuiIconName.ICON_FOLDER if e.is_dir else rl.GuiIconName.ICON_FILE
-		rl.GuiDrawIcon(icon, i32(row.x + 6), i32(ry + 6), 1, rl.DARKGRAY)
-		rl.DrawText(e.label, i32(row.x + 30), i32(ry + 4), 20, rl.BLACK)
+		rl.GuiDrawIcon(icon, i32(row.x + S(6)), i32(ry + S(6)), max(1, i32(ui_scale)), rl.DARKGRAY)
+		draw_text(e.label, i32(row.x + S(30)), i32(ry + S(4)), rl.BLACK)
 		if hover && rl.IsMouseButtonPressed(.LEFT) && !b.path_edit {
 			now := rl.GetTime()
 			if i == b.last_index && now - b.last_click < 0.4 {
@@ -205,15 +207,15 @@ browser_update_draw :: proc(b: ^Browser, typing: ^bool) -> bool {
 	rl.EndScissorMode()
 	if len(b.entries) == 0 {
 		msg: cstring = "No PNG files here." if b.mode == .Open_File else "No subfolders."
-		rl.DrawText(msg, i32(list.x + 12), i32(list.y + 10), 20, rl.GRAY)
+		draw_text(msg, i32(list.x + S(12)), i32(list.y + S(10)), rl.GRAY)
 	}
 
 	// Footer
 	fy := box.y + box.height - footer
-	if b.error != "" do rl.DrawText(strings.clone_to_cstring(b.error, context.temp_allocator), i32(x), i32(fy + 8), 20, rl.RED)
+	if b.error != "" do draw_text(strings.clone_to_cstring(b.error, context.temp_allocator), i32(x), i32(fy + S(8)), rl.RED)
 	ok_label: cstring = "Open" if b.mode == .Open_File else "Use this folder"
-	ok_w := f32(170)
-	if rl.GuiButton({x + inner_w - ok_w, fy, ok_w, 34}, ok_label) {
+	ok_w := S(170)
+	if rl.GuiButton({x + inner_w - ok_w, fy, ok_w, S(34)}, ok_label) {
 		if b.mode == .Pick_Folder {
 			if b.selected >= 0 && b.entries[b.selected].is_dir {
 				full, _ := os.join_path({b.dir, b.entries[b.selected].name}, context.temp_allocator)
@@ -226,7 +228,7 @@ browser_update_draw :: proc(b: ^Browser, typing: ^bool) -> bool {
 		}
 		return true
 	}
-	if rl.GuiButton({x + inner_w - ok_w - 110, fy, 100, 34}, "Cancel") {
+	if rl.GuiButton({x + inner_w - ok_w - S(110), fy, S(100), S(34)}, "Cancel") {
 		browser_close(b)
 		return true
 	}
@@ -246,9 +248,9 @@ browser_update_draw :: proc(b: ^Browser, typing: ^bool) -> bool {
 				moved = true
 			}
 			if moved && b.selected >= 0 { 	// keep the selection visible
-				top := f32(b.selected) * BROWSER_ROW
+				top := f32(b.selected) * ROW
 				if top < b.scroll do b.scroll = top
-				if top + BROWSER_ROW > b.scroll + list.height do b.scroll = top + BROWSER_ROW - list.height
+				if top + ROW > b.scroll + list.height do b.scroll = top + ROW - list.height
 			}
 		}
 	}

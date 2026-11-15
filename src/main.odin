@@ -7,7 +7,7 @@ import "core:strings"
 import im "imaging"
 import rl "vendor:raylib"
 
-CORNER_HIT :: 12 // screen px
+CORNER_HIT :: 12 // screen px at 1x
 
 main :: proc() {
 	opts, ok := parse_args(os.args[1:])
@@ -25,7 +25,6 @@ main :: proc() {
 	rl.SetWindowMinSize(900, 650)
 	rl.SetExitKey(.KEY_NULL)
 	rl.SetTargetFPS(0 if opts.fast else 60)
-	rl.GuiSetStyle(.DEFAULT, i32(rl.GuiDefaultProperty.TEXT_SIZE), 20)
 
 	app := App {
 		selected       = -1,
@@ -34,6 +33,9 @@ main :: proc() {
 		out_h          = 1050,
 		radius         = 36,
 	}
+	// Record/replay keep a 1x layout: recorded clicks are window pixels.
+	ui_scale_init(&app.ui, h.mode != .Off)
+	if h.mode == .Off && ui_scale != 1 do ui_size_window(f32(win_w), f32(win_h))
 	set_status(&app, false, "Open a scan (or drop a PNG on the window) to begin.")
 	scan := h.scan if h.mode != .Off else opts.scan
 	if scan != "" do load_scan(&app, scan)
@@ -46,6 +48,7 @@ main :: proc() {
 		if !harness_frame(&h, &app) do break
 		poll_export(&app)
 		handle_drops(&app)
+		if ui_scale_update(&app.ui) do on_ui_scale_changed(&app)
 		if rl.IsWindowResized() {
 			if !app.view_touched do fit_view(&app)
 			if app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas_rect(), f32(app.big_tex.width), f32(app.big_tex.height), 1)
@@ -75,8 +78,17 @@ main :: proc() {
 	if app.job != nil do export_destroy(app.job) // waits for the worker
 	harness_finish(&h, &app)
 	unload_scan(&app)
+	fonts_unload()
 	rl.CloseWindow()
 	if h.exit_code != 0 do os.exit(h.exit_code)
+}
+
+on_ui_scale_changed :: proc(app: ^App) {
+	if !app.view_touched do fit_view(app)
+	mark_preview_dirty(app)
+	if app.big_tex.id != 0 do fit_view_to(&app.big_view, canvas_rect(), f32(app.big_tex.width), f32(app.big_tex.height), 1)
+	mode := "manual" if app.ui.manual > 0 else "auto"
+	set_status(app, false, "Interface scale %.1fx (%s). Ctrl+= / Ctrl+- to change, Ctrl+0 for auto.", ui_scale, mode)
 }
 
 take_browser_result :: proc(app: ^App) {
@@ -115,6 +127,7 @@ handle_keys :: proc(app: ^App) {
 	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 	ctrl := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.LEFT_SUPER)
 
+	if ui_scale_keys(&app.ui, ctrl) do on_ui_scale_changed(app)
 	if ctrl && rl.IsKeyPressed(.O) do open_scan_dialog(app)
 	if ctrl && rl.IsKeyPressed(.E) do request_export(app)
 	if !has_scan(app) do return
@@ -237,7 +250,7 @@ handle_canvas_input :: proc(app: ^App) {
 
 	// Corner hit: prefer the selected card, then any card.
 	hit_region, hit_corner := -1, -1
-	best := f32(CORNER_HIT)
+	best := S(CORNER_HIT)
 	try_region :: proc(app: ^App, i: int, mouse: rl.Vector2, best: ^f32, hr, hc: ^int) {
 		for c in 0 ..< 4 {
 			d := rl.Vector2Distance(to_screen(app.view, app.regions[i].corners[c]), mouse)
@@ -312,20 +325,21 @@ draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 		col := COLOR_SELECTED if sel else COLOR_REGION
 		pts: [4]rl.Vector2
 		for c in 0 ..< 4 do pts[c] = to_screen(v, r.corners[c])
-		for c in 1 ..< 4 do rl.DrawLineEx(pts[c], pts[(c + 1) % 4], 2, col)
-		rl.DrawLineEx(pts[0], pts[1], 4 if sel else 3, COLOR_TOP) // card's top edge
+		for c in 1 ..< 4 do rl.DrawLineEx(pts[c], pts[(c + 1) % 4], S(2), col)
+		rl.DrawLineEx(pts[0], pts[1], S(4) if sel else S(3), COLOR_TOP) // card's top edge
 		for c in 0 ..< 4 {
 			focused := sel && c == app.focused_corner
-			s: f32 = 10 if focused else 7
+			s := S(10) if focused else S(7)
 			rl.DrawRectangleV(pts[c] - s / 2, {s, s}, rl.WHITE if focused else col)
-			rl.DrawRectangleLinesEx({pts[c].x - s / 2, pts[c].y - s / 2, s, s}, 1, rl.BLACK)
+			rl.DrawRectangleLinesEx({pts[c].x - s / 2, pts[c].y - s / 2, s, s}, max(1, S(1)), rl.BLACK)
 		}
 		if show_labels {
 			center := (pts[0] + pts[1] + pts[2] + pts[3]) / 4
 			label := fmt.ctprintf("%d", i + 1)
-			tw := f32(rl.MeasureText(label, 40))
-			rl.DrawRectangleRounded({center.x - tw / 2 - 10, center.y - 26, tw + 20, 52}, 0.3, 6, {0, 0, 0, 160})
-			rl.DrawText(label, i32(center.x - tw / 2), i32(center.y - 20), 40, col)
+			tw := measure_big_text(label)
+			rl.DrawRectangleRounded({center.x - tw / 2 - S(10), center.y - S(26), tw + S(20), S(52)}, 0.3, 6, {0, 0, 0, 160})
+			// Inter's digits span 0.24-0.97 em below the line top; center that band.
+			draw_big_text(label, i32(center.x - tw / 2), i32(center.y - 0.605 * f32(fonts.big_size)), col)
 		}
 	}
 	// Points placed so far for a new card, with a rubber band to the mouse.
@@ -334,8 +348,8 @@ draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 		for p, i in app.place_pts {
 			sp := to_screen(v, p)
 			next := to_screen(v, app.place_pts[i + 1]) if i + 1 < len(app.place_pts) else mouse
-			rl.DrawLineEx(sp, next, 2, COLOR_SELECTED)
-			rl.DrawCircleV(sp, 5, COLOR_SELECTED)
+			rl.DrawLineEx(sp, next, S(2), COLOR_SELECTED)
+			rl.DrawCircleV(sp, S(5), COLOR_SELECTED)
 		}
 	}
 }
@@ -344,8 +358,8 @@ draw_canvas :: proc(app: ^App) {
 	canvas := canvas_rect()
 	if !has_scan(app) {
 		msg: cstring = "Open a scan PNG (Ctrl+O) or drop one here"
-		w := rl.MeasureText(msg, 30)
-		rl.DrawText(msg, i32(canvas.width / 2) - w / 2, i32(canvas.height / 2) - 15, 30, rl.LIGHTGRAY)
+		w := i32(measure_text(msg))
+		draw_text(msg, i32(canvas.width / 2) - w / 2, i32(canvas.height / 2 - S(10)), rl.LIGHTGRAY)
 		return
 	}
 	// Show individual pixels when zoomed in for precise corner placement.
@@ -366,34 +380,36 @@ draw_loupe :: proc(app: ^App) {
 	mouse := rl.GetMousePosition()
 	canvas := canvas_rect()
 	if !rl.CheckCollisionPointRec(mouse, canvas) do return
-	SIZE :: 220
+	SIZE := S(220)
+	off := S(30)
 	focus := to_source(app.view, mouse)
 	if app.drag == .Corner do focus = app.regions[app.selected].corners[app.drag_corner]
 	zoom := max(app.view.zoom * 6, 4)
-	box := rl.Rectangle{mouse.x + 30, mouse.y + 30, SIZE, SIZE}
-	if box.x + SIZE > canvas.x + canvas.width do box.x = mouse.x - 30 - SIZE
-	if box.y + SIZE > canvas.y + canvas.height do box.y = mouse.y - 30 - SIZE
+	box := rl.Rectangle{mouse.x + off, mouse.y + off, SIZE, SIZE}
+	if box.x + SIZE > canvas.x + canvas.width do box.x = mouse.x - off - SIZE
+	if box.y + SIZE > canvas.y + canvas.height do box.y = mouse.y - off - SIZE
 	center := rl.Vector2{box.x + SIZE / 2, box.y + SIZE / 2}
 	v := View{zoom = zoom, offset = center - rl.Vector2{f32(focus.x), f32(focus.y)} * zoom}
 	prev := app.tex_filter
 	rl.SetTextureFilter(app.tex, .POINT)
-	rl.BeginScissorMode(i32(box.x), i32(box.y), SIZE, SIZE)
+	rl.BeginScissorMode(i32(box.x), i32(box.y), i32(SIZE), i32(SIZE))
 	rl.DrawRectangleRec(box, rl.BLACK)
 	draw_scene(app, v, false)
-	rl.DrawLineEx({center.x - 12, center.y}, {center.x + 12, center.y}, 1, rl.MAGENTA)
-	rl.DrawLineEx({center.x, center.y - 12}, {center.x, center.y + 12}, 1, rl.MAGENTA)
+	arm := S(12)
+	rl.DrawLineEx({center.x - arm, center.y}, {center.x + arm, center.y}, max(1, S(1)), rl.MAGENTA)
+	rl.DrawLineEx({center.x, center.y - arm}, {center.x, center.y + arm}, max(1, S(1)), rl.MAGENTA)
 	rl.EndScissorMode()
 	rl.SetTextureFilter(app.tex, prev)
-	rl.DrawRectangleLinesEx(box, 2, rl.WHITE)
+	rl.DrawRectangleLinesEx(box, S(2), rl.WHITE)
 }
 
 draw_checker :: proc(r: rl.Rectangle) {
 	rl.BeginScissorMode(i32(r.x), i32(r.y), i32(r.width), i32(r.height))
 	rl.DrawRectangleRec(r, {205, 205, 205, 255})
-	S :: 12
-	for y := 0; f32(y * S) < r.height; y += 1 {
-		for x := (y & 1); f32(x * S) < r.width; x += 2 {
-			rl.DrawRectangle(i32(r.x) + i32(x * S), i32(r.y) + i32(y * S), S, S, {245, 245, 245, 255})
+	cell := i32(S(12))
+	for y: i32 = 0; f32(y * cell) < r.height; y += 1 {
+		for x := (y & 1); f32(x * cell) < r.width; x += 2 {
+			rl.DrawRectangle(i32(r.x) + x * cell, i32(r.y) + y * cell, cell, cell, {245, 245, 245, 255})
 		}
 	}
 	rl.EndScissorMode()
@@ -403,7 +419,7 @@ draw_big_preview :: proc(app: ^App) {
 	canvas := canvas_rect()
 	draw_checker(canvas)
 	if app.big_tex.id == 0 {
-		rl.DrawText("Rendering...", i32(canvas.x + 20), i32(canvas.y + 20), 20, rl.DARKGRAY)
+		draw_text("Rendering...", i32(canvas.x + S(20)), i32(canvas.y + S(20)), rl.DARKGRAY)
 		return
 	}
 	v := app.big_view
@@ -411,29 +427,36 @@ draw_big_preview :: proc(app: ^App) {
 	rl.BeginScissorMode(i32(canvas.x), i32(canvas.y), i32(canvas.width), i32(canvas.height))
 	rl.DrawTexturePro(app.big_tex, {0, 0, f32(app.big_tex.width), f32(app.big_tex.height)}, {v.offset.x, v.offset.y, f32(app.big_tex.width) * v.zoom, f32(app.big_tex.height) * v.zoom}, {}, 0, rl.WHITE)
 	rl.EndScissorMode()
-	info := rl.TextFormat("Card %d at export size %d x %d, zoom %.0f%%. Wheel zooms, drag pans, 1 = 100%%, F = fit, P/Esc closes.", app.selected + 1, app.big_tex.width, app.big_tex.height, v.zoom * 100)
-	rl.DrawRectangle(0, 0, i32(canvas.width), 32, {0, 0, 0, 170})
-	rl.DrawText(info, 10, 6, 20, rl.WHITE)
+	info := rl.TextFormat("Card %d at export size %d × %d, zoom %.0f%%. Wheel zooms, drag pans, 1 = 100%%, F = fit, P/Esc closes.", app.selected + 1, app.big_tex.width, app.big_tex.height, v.zoom * 100)
+	rl.DrawRectangle(0, 0, i32(canvas.width), i32(S(32)), {0, 0, 0, 170})
+	draw_text(info, i32(S(10)), i32(S(6)), rl.WHITE)
 }
 
 draw_status :: proc(app: ^App) {
-	sh := rl.GetScreenHeight()
-	sw := rl.GetScreenWidth()
-	rl.DrawRectangle(0, sh - STATUS_H, sw, STATUS_H, {28, 29, 33, 255})
+	sh, sw := f32(rl.GetScreenHeight()), f32(rl.GetScreenWidth())
+	rl.DrawRectangleRec({0, sh - status_h, sw, status_h}, {28, 29, 33, 255})
 	text := strings.clone_to_cstring(status_text(app), context.temp_allocator)
-	rl.DrawText(text, PAD, sh - STATUS_H + 6, 20, rl.Color{255, 120, 110, 255} if app.status_error else rl.Color{220, 220, 220, 255})
+	draw_text(text, i32(pad), i32(sh - status_h + S(6)), rl.Color{255, 120, 110, 255} if app.status_error else rl.Color{220, 220, 220, 255})
 }
 
 draw_confirm :: proc(app: ^App) {
 	if app.confirm_count <= 0 do return
 	sw, sh := f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())
 	rl.DrawRectangle(0, 0, i32(sw), i32(sh), {0, 0, 0, 140})
-	msg := rl.TextFormat("%d file(s) with these names already exist\nin the output folder. Replace them?", app.confirm_count)
-	res := rl.GuiMessageBox({sw / 2 - 260, sh / 2 - 90, 520, 180}, "Replace files?", msg, "Replace;Cancel")
-	if res == 1 {
+	w, h := S(520), S(190)
+	content, closed := dialog_frame({(sw - w) / 2, (sh - h) / 2, w, h}, "Replace files?")
+	x, y := content.x + S(16), content.y + S(14)
+	text_col := rl.GetColor(u32(rl.GuiGetStyle(.LABEL, i32(rl.GuiControlProperty.TEXT_COLOR_NORMAL))))
+	draw_text(rl.TextFormat("%d file(s) with these names already exist", app.confirm_count), i32(x), i32(y), text_col)
+	draw_text("in the output folder. Replace them?", i32(x), i32(y + S(26)), text_col)
+	bw, bh := S(140), S(36)
+	by := content.y + content.height - bh - S(14)
+	replace := rl.GuiButton({content.x + content.width - S(16) - bw, by, bw, bh}, "Replace")
+	cancel := rl.GuiButton({content.x + content.width - S(16) - bw * 2 - S(10), by, bw, bh}, "Cancel")
+	if replace {
 		app.confirm_count = 0
 		start_export(app)
-	} else if res == 0 || res == 2 || rl.IsKeyPressed(.ESCAPE) {
+	} else if cancel || closed || rl.IsKeyPressed(.ESCAPE) {
 		app.confirm_count = 0
 	}
 }

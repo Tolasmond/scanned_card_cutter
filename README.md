@@ -23,6 +23,17 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | Wheel, right/middle drag, drag on empty space | Zoom, pan |
 | F | Fit the scan to the window |
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
+
+### Interface scale
+
+The interface scales for high-density monitors and follows the window when it moves to another monitor. Text uses Inter, which is rendered again at the exact pixel size for each scale, so it stays sharp at any scale.
+
+- **Windows:** uses the display scale set in Windows.
+- **macOS:** 1x. macOS already lays windows out in points and scales them.
+- **Linux:** uses `Xft.dpi` when set. Otherwise it uses the monitor's pixel density in whole steps (about 150–250 dpi gives 2x). Under XWayland with `force_zero_scaling`, this is what makes the text readable.
+
+Ctrl+= and Ctrl+- override the automatic choice for the session, in 0.25 steps.
 
 ## Building
 
@@ -57,7 +68,7 @@ A recording names its scan. A relative path is looked up in the working director
 
 Limits to keep in mind when recording:
 
-- **Fixed window.** Record and replay use a 1500 x 950 window that cannot be resized, which tiling window managers float. Mouse positions are window pixels, so a replay at any other size fails immediately (exit 3). If the window is resized while recording, recording stops there.
+- **Fixed window.** Record and replay use a 1500 x 950 window that cannot be resized, which tiling window managers float. They also always use a 1x interface scale, whatever the monitor, so controls stay at the recorded positions. Mouse positions are window pixels, so a replay at any other size fails immediately (exit 3). If the window is resized while recording, recording stops there.
 - **Not recorded:** text typed into the panel's text and number boxes (raylib records keys, not the characters they type), the OS's held-key repeat (tap the arrow keys instead of holding them), dropped files, and anything inside the file browser that depends on the disk. Pass the scan on the command line and the folder with `--out`.
 - **Smooth scrolling** from a touchpad is recorded in whole wheel steps, so use a mouse wheel or F (fit) when zoom matters.
 - **Hands off during a replay.** A real pointer wandering over the window is overridden, but real clicks and keys are not.
@@ -73,6 +84,9 @@ Limits to keep in mind when recording:
 | `src/panel.odin` | Side panel UI |
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
 | `src/export.odin` | Background export thread and PNG writing |
+| `src/ui_scale.odin` | Interface scale: monitor detection, `S()`/`fs()` sizing helpers, scaled dialog frame |
+| `src/fonts.odin` | Inter fonts compiled into the executable, re-rendered for each scale; `draw_text`/`measure_text` |
+| `assets/fonts/` | Inter Regular and SemiBold (SIL Open Font License 1.1, license alongside) |
 | `src/replay.odin` | Input record/replay harness and the state dump replays are checked against |
 | `tests/replay/` | Recorded sessions (`*.rec`), their scans, and expected results (`*.expected/`) |
 
