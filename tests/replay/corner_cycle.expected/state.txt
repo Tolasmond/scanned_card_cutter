@@ -1,0 +1,9 @@
+scan synthetic_cards.png 810 x 420
+output 750 x 1050 radius 36 trim 0 prefix "synthetic_cards"
+moire off
+cards 3 selected 3 focused_corner 4
+card 1 (44.00, 32.00) (286.00, 28.00) (292.00, 369.00) (49.00, 373.00) review
+card 2 (287.00, 28.00) (528.00, 24.00) (532.00, 365.00) (291.00, 369.00) review
+card 3 (552.00, 26.00) (796.00, 29.00) (791.00, 370.00) (548.00, 367.00)
+preview closed
+status Detected 3 card(s); 2 marked for review (pink): check their edges.

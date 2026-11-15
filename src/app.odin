@@ -256,6 +256,16 @@ zoom_at :: proc(v: ^View, anchor: rl.Vector2, factor: f32, min_zoom: f32 = 0.02,
 	v.zoom = nz
 }
 
+// Centers source point p in rect when it lies outside it or within margin of
+// its edge (screen px). Returns true if the view moved.
+pan_to_show :: proc(v: ^View, p: im.Vec2, rect: rl.Rectangle, margin: f32) -> bool {
+	s := to_screen(v^, p)
+	inner := rl.Rectangle{rect.x + margin, rect.y + margin, rect.width - 2 * margin, rect.height - 2 * margin}
+	if rl.CheckCollisionPointRec(s, inner) do return false
+	v.offset += rl.Vector2{rect.x + rect.width / 2, rect.y + rect.height / 2} - s
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // Region editing
 // ---------------------------------------------------------------------------

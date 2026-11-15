@@ -8,6 +8,7 @@ import im "imaging"
 import rl "vendor:raylib"
 
 CORNER_HIT :: 16 // grab radius around a corner, screen px at 1x
+CORNER_SHOW_MARGIN :: 40 // C pans to a corner closer than this to the canvas edge, at 1x
 
 main :: proc() {
 	opts, ok := parse_args(os.args[1:])
@@ -130,6 +131,7 @@ handle_keys :: proc(app: ^App) {
 	if app.typing || app.edit_field != .None do return
 	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 	ctrl := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.LEFT_SUPER)
+	alt := rl.IsKeyDown(.LEFT_ALT) || rl.IsKeyDown(.RIGHT_ALT)
 
 	if ui_scale_keys(&app.ui, ctrl) do on_ui_scale_changed(app)
 	if ctrl && rl.IsKeyPressed(.Q) do app.quit = true
@@ -154,6 +156,14 @@ handle_keys :: proc(app: ^App) {
 	if rl.IsKeyPressed(.M) do set_moire(app, !app.moire)
 	if rl.IsKeyPressed(.D) do start_detection(app)
 	if rl.IsKeyPressed(.F) do fit_view(app)
+	if rl.IsKeyPressed(.C) && alt && !ctrl && len(app.regions) > 0 {
+		// Alt+C: corner 1 of the next card; Shift+Alt+C: of the previous one.
+		n := len(app.regions)
+		i := (n - 1 if shift else 0) if app.selected < 0 else (app.selected + (n - 1 if shift else 1)) % n
+		select_region(app, i)
+		focus_corner(app, 0)
+		return
+	}
 	if app.selected < 0 do return
 
 	if rl.IsKeyPressed(.DELETE) || rl.IsKeyPressed(.BACKSPACE) {
@@ -165,10 +175,11 @@ handle_keys :: proc(app: ^App) {
 		app.regions[app.selected].review = false
 		mark_preview_dirty(app)
 	}
-	if rl.IsKeyPressed(.C) && !ctrl {
-		// Cycle the nudge target: whole card -> corner 1..4 -> whole card
-		// Values run -1 (whole card), 0..3 (corners); Shift+C goes backwards.
-		app.focused_corner = (app.focused_corner + 1 + (4 if shift else 1)) % 5 - 1
+	if rl.IsKeyPressed(.C) && !ctrl && !alt {
+		// Cycle the nudge target round corners 1..4; Shift+C goes backwards.
+		// From the whole card (-1) it starts at corner 1, or corner 4 backwards.
+		c := app.focused_corner
+		focus_corner(app, (3 if shift else 0) if c < 0 else (c + (3 if shift else 1)) % 4)
 	}
 	step := 10.0 if shift else 1.0
 	delta: im.Vec2
@@ -177,6 +188,13 @@ handle_keys :: proc(app: ^App) {
 	if rl.IsKeyPressed(.UP) || rl.IsKeyPressedRepeat(.UP) do delta.y -= step
 	if rl.IsKeyPressed(.DOWN) || rl.IsKeyPressedRepeat(.DOWN) do delta.y += step
 	if delta != {} do move_region(app, app.selected, app.focused_corner, delta)
+}
+
+// Makes corner c of the selected card the nudge target, panning to it if needed.
+focus_corner :: proc(app: ^App, c: int) {
+	app.focused_corner = c
+	corner := app.regions[app.selected].corners[c]
+	if pan_to_show(&app.view, corner, canvas_rect(), S(CORNER_SHOW_MARGIN)) do app.view_touched = true
 }
 
 start_placing :: proc(app: ^App) {
