@@ -2,19 +2,28 @@
 # Build Scan Tool on Linux or macOS using only the Odin toolchain.
 #   ./build.sh                  optimized build  -> build/scan_tool
 #   ./build.sh debug            debug build with bounds checks and symbols
-#   ./build.sh test             run the imaging unit tests
+#   ./build.sh test             run the imaging and synthetic-scan unit tests
 #   ./build.sh replay           replay tests/replay/*.rec and compare with *.expected/
 #   ./build.sh replay --update  (re)write the expected results from the current build
+#   ./build.sh synth DIR [opts] generate synthetic scans + DIR/annotations.json (tools/synth)
 #   ./build.sh bench ANN DIR    score card detection: annotation file ANN, scans in DIR
+#   ./build.sh moire-bench DIR  score moiré removal on a corpus made with `synth DIR --clean`
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
 case "$1" in
   debug) odin build src -out:build/scan_tool -debug -vet -strict-style ;;
-  test)  odin test src/imaging -vet -strict-style ;;
+  test)  odin test src/imaging -vet -strict-style && odin test tools/synth -vet -strict-style -o:speed ;;
+  synth)
+    [ -n "$2" ] || { echo "usage: ./build.sh synth OUTDIR [--clean] [--only PRESET] [--count N] [--scale S]"; exit 2; }
+    odin build tools/synth -o:speed -vet -strict-style -out:build/synth
+    shift; build/synth "$@" ;;
+  moire-bench)
+    [ -n "$2" ] || { echo "usage: ./build.sh moire-bench CORPUS_DIR [development|holdout]"; exit 2; }
+    odin run tools/moire_bench -o:speed -vet -strict-style -out:build/moire_bench -- "$2" $3 ;;
   bench)
     [ -n "$3" ] || { echo "usage: ./build.sh bench ANNOTATIONS.json IMAGE_DIR [development|holdout]"; exit 2; }
-    odin run tools/detect_bench -o:speed -vet -strict-style -out:build/detect_bench -- "$2" "$3" $4 ;;
+    odin run tools/detect_bench -o:speed -vet -strict-style -out:build/detect_bench -- "$2" "$3" $4 $5 $6 ;;
   replay)
     odin build src -out:build/scan_tool -o:speed -vet -strict-style
     set -- tests/replay/*.rec "$2"

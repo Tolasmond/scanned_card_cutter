@@ -1,6 +1,6 @@
 // Scores card detection against hand-corrected corners.
 //
-//   ./build.sh bench ANNOTATIONS.json IMAGE_DIR [development|holdout]
+//   ./build.sh bench ANNOTATIONS.json IMAGE_DIR [development|holdout] [--dump DETECTIONS.json]
 //
 // Annotation file format:
 //   {"scans": [{"id": "...", "split": "development" | "holdout",
@@ -18,6 +18,7 @@ import "core:fmt"
 import "core:math"
 import "core:os"
 import "core:slice"
+import "core:strings"
 import "core:time"
 import im "../../src/imaging"
 import rl "vendor:raylib"
@@ -66,8 +67,18 @@ main :: proc() {
 		fmt.eprintln("bad annotation file:", jerr)
 		os.exit(2)
 	}
-	only := os.args[3] if len(os.args) > 3 else ""
+	only := ""
+	dump_path := ""
+	for i := 3; i < len(os.args); i += 1 {
+		if os.args[i] == "--dump" && i + 1 < len(os.args) {
+			i += 1
+			dump_path = os.args[i]
+		} else do only = os.args[i]
+	}
 	rl.SetTraceLogLevel(.WARNING)
+	dump := strings.builder_make()
+	fmt.sbprint(&dump, "{")
+	dumped := 0
 
 	for split in ([]string{"development", "holdout"}) {
 		if only != "" && only != split do continue
@@ -88,6 +99,14 @@ main :: proc() {
 			cands := im.detect_cards(src)
 			ms_total += time.duration_milliseconds(time.since(t))
 			scans += 1
+			fmt.sbprintf(&dump, "%s\n\"%s\": [", "," if dumped > 0 else "", s.id)
+			for c, ci in cands {
+				fmt.sbprintf(&dump, "%s{{\"source\": \"%v\", \"corners\": [", "," if ci > 0 else "", c.source)
+				for q, k in c.corners do fmt.sbprintf(&dump, "%s[%.0f,%.0f]", "," if k > 0 else "", q.x, q.y)
+				fmt.sbprint(&dump, "]}")
+			}
+			fmt.sbprint(&dump, "]")
+			dumped += 1
 
 			truth := make([]im.Quad, len(s.regions), context.temp_allocator)
 			for r, i in s.regions do for k in 0 ..< 4 do truth[i][k] = {r[k][0], r[k][1]}
@@ -122,5 +141,9 @@ main :: proc() {
 		fmt.printfln("%-12s recall %d/%d  false %d  corner error median %.2f  p95 %.2f  max %.2f px  (%.0f ms/scan)",
 			split, found, total, false_pos, percentile(errs[:], 50), percentile(errs[:], 95), percentile(errs[:], 100), ms_total / f64(scans))
 		delete(errs)
+	}
+	if dump_path != "" {
+		fmt.sbprint(&dump, "\n}\n")
+		_ = os.write_entire_file(dump_path, transmute([]u8)strings.to_string(dump))
 	}
 }

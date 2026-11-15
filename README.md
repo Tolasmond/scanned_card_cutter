@@ -62,7 +62,9 @@ Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin
 ./build.sh          # Linux / macOS -> build/scan_tool
 ./build.sh test     # imaging unit tests (headless)
 ./build.sh replay   # replay tests (opens a window; see Testing)
+./build.sh synth DIR  # generate synthetic test scans (see Testing)
 ./build.sh bench ANN DIR  # score card detection against annotation file ANN
+./build.sh moire-bench DIR  # score moiré removal on a synthetic corpus
 build.bat           # Windows -> build\scan_tool.exe (needs the MSVC linker, as Odin does)
 ```
 
@@ -94,12 +96,53 @@ Limits to keep in mind when recording:
 - **Hands off during a replay.** A real pointer wandering over the window is overridden, but real clicks and keys are not.
 - **Windows:** `build.bat` has no `replay` runner yet; run `scan_tool.exe --replay` directly.
 
+### Synthetic scans
+
+Real card art can't be published, so detection and moiré removal are measured on synthetic scans that `tools/synth` generates. It simulates printing and scanning rather than drawing the result:
+
+- **Printing:** procedural card art is converted to CMYK. Each ink is printed as an AM halftone at its usual screen angle (C 15°, M 75°, Y 0°, K 45°, 133–175 lpi), with dot gain and uneven ink spread, and overlapping inks multiply.
+- **Scanning:** the scanner integrates 4x4 samples per 300 dpi pixel. Resampling the halftone this way is what produces real moiré. Scanner effects are layered on top: lid texture and vignetting, lamp shadow beside card edges and on overlapped cards, an optional dark lid strip, optical blur, sensor and line noise, and a slight color cast.
+- **Layouts (presets):** `separated`, `packed` (gaps of 0–8 px, some cards touching, a lid strip, the last column cut by the scan edge), `overlap` (cards lying up to 12 px over each other), `rotated` (up to 10°), `pale` (white frames on the white lid) and `poker_packed`.
+- **Ground truth:** every scan comes with its cards' exact corners, written to `annotations.json` in the format `tools/detect_bench` reads. With `--clean`, each scan also gets a twin printed without halftone and without noise, which is the target for moiré removal.
+
+Generation is deterministic: the generator carries its own PRNG and noise. Two scans per preset per split take about 2 minutes, and the files stay out of the repository:
+
+```sh
+./build.sh synth /tmp/corpus --count 2 --clean
+./build.sh bench /tmp/corpus/annotations.json /tmp/corpus development
+./build.sh moire-bench /tmp/corpus development
+```
+
+Baseline (2 scans per preset per split, 2026-11-15):
+
+| Detection | Recall | False proposals | Median corner error | P95 |
+| --- | ---: | ---: | ---: | ---: |
+| `separated` | 24/24 | 3 | 2.2 px | 4.6 px |
+| `rotated` | 16/16 | 0 | 2.2 px | 3.7 px |
+| `poker_packed` | 36/36 | 1 | 4.8 px | 26.8 px |
+| `packed` | 19/24 | 1 | 6.1 px | 24.7 px |
+| `overlap` | 13/24 | 1 | 16.5 px | 32.8 px |
+| `pale` | 36/36 | 0 | 52.8 px | 61.5 px |
+| **development** | 66/80 | 5 | 4.7 px | 60.0 px |
+| **holdout** | 78/80 | 1 | 7.6 px | 61.1 px |
+
+| Moiré removal (PSNR against the clean twin, card interiors) | Raw scan | Filtered | Gain |
+| --- | ---: | ---: | ---: |
+| development | 32.18 dB | 38.95 dB | +6.77 dB |
+| holdout | 32.28 dB | 38.87 dB | +6.60 dB |
+
+The corpus shows the detector's known weak spots, inherited from the original. Overlapping cards merge into one outline. A block of touching cards stays merged when no single card shows the card size to split it by. On white-framed cards the frame is indistinguishable from the white lid, so every corner lands on the art window, about 50 px inside the card. The false proposals in `separated` are artwork on pale frames. On simple layouts the detector is accurate to about 2 px.
+
+The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_small` preset: three cards at 150 dpi, with a pair close enough to need the grid split.
+
 ## Layout
 
 | Path | Contents |
 | --- | --- |
 | `src/imaging/` | Pure-Odin image processing (no raylib): homography, bicubic perspective warp, Lanczos-3 resize, anti-aliased rounded-corner mask, the moiré filter (`descreen.odin`), card detection (`detect.odin`, with `morph.odin` for masks/Canny and `contours.odin` for contours and geometry), multithreaded row helper. Unit tested. |
-| `tools/detect_bench/` | Detection benchmark against hand-corrected corners (`./build.sh bench DIR`) |
+| `tools/detect_bench/` | Detection benchmark against annotated corners (`./build.sh bench ANN DIR`) |
+| `tools/synth/` | Synthetic printed-and-scanned card generator with exact ground truth (`./build.sh synth DIR`) |
+| `tools/moire_bench/` | Moiré removal score against the clean twins (`./build.sh moire-bench DIR`) |
 | `src/app.odin` | Application state, scan loading, card editing, preview, export requests |
 | `src/main.odin` | Window loop, canvas input and drawing, magnifier, full-size preview |
 | `src/panel.odin` | Side panel UI |
