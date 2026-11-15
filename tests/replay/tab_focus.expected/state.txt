@@ -1,0 +1,9 @@
+scan synthetic_cards.png 810 x 420
+output 243 x 341 radius 36 trim 0 prefix "synthetic_cards"
+moire off
+cards 3 selected 2 focused_corner 1
+card 1 (44.00, 32.00) (286.00, 28.00) (292.00, 369.00) (49.00, 373.00) review
+card 2 (293.00, 369.00) (287.00, 28.00) (528.00, 24.00) (532.00, 365.00)
+card 3 (552.00, 26.00) (796.00, 29.00) (791.00, 370.00) (548.00, 367.00)
+preview closed
+status Exported 3 cards to <out>

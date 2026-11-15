@@ -64,7 +64,8 @@ App :: struct {
 	// Output settings
 	out_w, out_h:    i32,
 	radius, trim:    i32,
-	edit_field:      int, // which value box is in edit mode (0 = none)
+	edit_field:      Focus, // which text or value box is in edit mode
+	edit_fresh:      bool, // edit started by Enter this frame; the box must not end it
 	panel_scroll:    f32, // side panel scroll offset when the window is too short
 	out_dir:         [1024]u8,
 	prefix:          [256]u8,
@@ -85,6 +86,10 @@ App :: struct {
 	job:             ^Export_Job,
 	confirm_count:   int, // > 0 while asking to overwrite this many files
 	typing:          bool, // a text box has keyboard focus this frame
+	focus:           Focus, // panel control with keyboard focus (.None = canvas)
+	focus_avail:     Focus_Set, // controls that can take focus, from the last frame drawn
+	focus_activate:  bool, // Enter/Space pressed for the focused control this frame
+	focus_moved:     bool, // focus moved by key this frame: scroll it into view
 	quit:            bool, // Exit button or Ctrl+Q
 	ui:              Ui_Scale_State,
 

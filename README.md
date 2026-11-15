@@ -20,7 +20,11 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | A / N | Add a card (click its 4 corners; Esc cancels) |
 | Drag corner / card | Move a corner / the whole card |
 | Arrows (Shift = 10 px) | Nudge the focused corner, or the whole card when no corner is focused |
-| Tab / Shift+Tab | Cycle focus: whole card → corners 1–4 |
+| C / Shift+C | Cycle the nudge target: whole card → corners 1–4 |
+| Tab / Shift+Tab | Move keyboard focus through the panel's buttons and boxes. A box is ready to type in when focused |
+| Enter / Space | Press the focused button or tick the focused box. Enter edits a focused box again after Esc |
+| Up / Down | With the card list focused: select the previous / next card |
+| Esc | Stop editing a box, then give the keys back to the canvas (so do clicks) |
 | R / Shift+R | Rotate the card's orientation 90° clockwise / counter-clockwise |
 | Del / Backspace | Delete the selected card |
 | Wheel, right/middle drag, drag on empty space | Zoom, pan |

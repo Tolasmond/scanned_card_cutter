@@ -6,13 +6,6 @@ import "core:os"
 import im "imaging"
 import rl "vendor:raylib"
 
-FIELD_W :: 1
-FIELD_H :: 2
-FIELD_RADIUS :: 3
-FIELD_TRIM :: 4
-FIELD_DIR :: 5
-FIELD_PREFIX :: 6
-
 @(private = "file")
 section :: proc(x, y: ^f32, w: f32, title: cstring) {
 	y^ += S(6)
@@ -20,24 +13,39 @@ section :: proc(x, y: ^f32, w: f32, title: cstring) {
 	y^ += S(26)
 }
 
+// A box toggled its edit mode (clicked, or Enter/click outside while editing).
+@(private = "file")
+toggle_edit :: proc(app: ^App, id: Focus) {
+	if app.edit_field == id {
+		if !app.edit_fresh do app.edit_field = .None
+	} else {
+		app.edit_field = id
+	}
+}
+
 // Value box with label; tracks which box is being edited in app.edit_field.
 @(private = "file")
-value_field :: proc(app: ^App, id: int, r: rl.Rectangle, label: cstring, value: ^i32, lo, hi: i32) {
+value_field :: proc(app: ^App, id: Focus, r: rl.Rectangle, label: cstring, value: ^i32, lo, hi: i32) {
 	lw := measure_text(label) + S(8)
 	rl.GuiLabel({r.x, r.y, lw, r.height}, label)
 	before := value^
-	if rl.GuiValueBox({r.x + lw, r.y, r.width - lw, r.height}, nil, value, lo, hi, app.edit_field == id) != 0 {
-		app.edit_field = 0 if app.edit_field == id else id
-	}
+	box := rl.Rectangle{r.x + lw, r.y, r.width - lw, r.height}
+	if rl.GuiValueBox(box, nil, value, lo, hi, app.edit_field == id) != 0 do toggle_edit(app, id)
+	// raygui clamps only when Enter or a click ends the edit, not when Tab does.
+	if app.edit_field != id do value^ = clamp(value^, lo, hi)
+	if app.edit_field == id do app.focus = id
+	focus_control(app, id, box)
 	if value^ != before do mark_preview_dirty(app)
 }
 
 @(private = "file")
-text_field :: proc(app: ^App, id: int, r: rl.Rectangle, buf: []u8) {
-	if rl.GuiTextBox(r, cstring(raw_data(buf)), i32(len(buf)), app.edit_field == id) {
-		app.edit_field = 0 if app.edit_field == id else id
+text_field :: proc(app: ^App, id: Focus, r: rl.Rectangle, buf: []u8) {
+	if rl.GuiTextBox(r, cstring(raw_data(buf)), i32(len(buf)), app.edit_field == id) do toggle_edit(app, id)
+	if app.edit_field == id {
+		app.typing = true
+		app.focus = id
 	}
-	if app.edit_field == id do app.typing = true
+	focus_control(app, id, r)
 }
 
 draw_panel :: proc(app: ^App) {
@@ -59,8 +67,9 @@ draw_panel :: proc(app: ^App) {
 	LINE := S(26) // one line of 20 px text in lists
 
 	// --- Scan ---------------------------------------------------------------
+	focus_begin_frame(app)
 	if busy do rl.GuiDisable()
-	if rl.GuiButton({x, y, w, ROW + S(4)}, "#1#Open scan...  (Ctrl+O)") do open_scan_dialog(app)
+	if focus_button(app, .Open, {x, y, w, ROW + S(4)}, "#1#Open scan...  (Ctrl+O)") do open_scan_dialog(app)
 	rl.GuiEnable()
 	y += ROW + S(10)
 	if has_scan(app) {
@@ -71,15 +80,15 @@ draw_panel :: proc(app: ^App) {
 
 	// --- Output size ----------------------------------------------------------
 	section(&x, &y, w, "Card output (pixels)")
-	value_field(app, FIELD_W, {x, y, half, ROW}, "Width", &app.out_w, 1, 20000)
-	value_field(app, FIELD_H, {x + half + gap, y, half, ROW}, "Height", &app.out_h, 1, 20000)
+	value_field(app, .Width, {x, y, half, ROW}, "Width", &app.out_w, 1, 20000)
+	value_field(app, .Height, {x + half + gap, y, half, ROW}, "Height", &app.out_h, 1, 20000)
 	y += ROW + S(6)
-	value_field(app, FIELD_RADIUS, {x, y, half, ROW}, "Radius", &app.radius, 0, 10000)
-	value_field(app, FIELD_TRIM, {x + half + gap, y, half, ROW}, "Trim", &app.trim, 0, 1000)
+	value_field(app, .Radius, {x, y, half, ROW}, "Radius", &app.radius, 0, 10000)
+	value_field(app, .Trim, {x + half + gap, y, half, ROW}, "Trim", &app.trim, 0, 1000)
 	y += ROW + S(6)
 	app.radius = clamp(app.radius, 0, min(app.out_w, app.out_h) / 2)
 	if app.selected < 0 do rl.GuiDisable()
-	if rl.GuiButton({x, y, half, ROW}, "Use card's size") && app.selected >= 0 {
+	if focus_button(app, .Use_Size, {x, y, half, ROW}, "Use card's size") && app.selected >= 0 {
 		nw, nh := im.quad_native_size(app.regions[app.selected].corners)
 		app.out_w = i32(nw - 2 * int(app.trim))
 		app.out_h = i32(nh - 2 * int(app.trim))
@@ -90,7 +99,10 @@ draw_panel :: proc(app: ^App) {
 	moire := app.moire
 	box := S(20)
 	moire_label := fmt.ctprintf("Remove moiré %d%%", moire_percent(app)) if app.moire && app.clean_job != nil else cstring("Remove moiré (M)")
-	rl.GuiCheckBox({x + half + gap, y + (ROW - box) / 2, box, box}, moire_label, &moire)
+	moire_box := rl.Rectangle{x + half + gap, y + (ROW - box) / 2, box, box}
+	rl.GuiCheckBox(moire_box, moire_label, &moire)
+	moire_focus := rl.Rectangle{moire_box.x, moire_box.y, box + S(6) + measure_text(moire_label), box}
+	if focus_activated(app, focus_control(app, .Moire, moire_focus)) do moire = !moire
 	if moire != app.moire do set_moire(app, moire)
 	y += ROW + S(4)
 
@@ -98,24 +110,24 @@ draw_panel :: proc(app: ^App) {
 	section(&x, &y, w, fmt.ctprintf("Cards (%d)", len(app.regions)))
 	if !has_scan(app) do rl.GuiDisable()
 	if app.placing {
-		if rl.GuiButton({x, y, half, ROW}, "Cancel add (Esc)") {
+		if focus_button(app, .Add, {x, y, half, ROW}, "Cancel add (Esc)") {
 			app.placing = false
 			clear(&app.place_pts)
 		}
-	} else if rl.GuiButton({x, y, half, ROW}, "Add card (A)") do start_placing(app)
+	} else if focus_button(app, .Add, {x, y, half, ROW}, "Add card (A)") do start_placing(app)
 	if app.selected < 0 do rl.GuiDisable()
-	if rl.GuiButton({x + half + gap, y, half, ROW}, "Delete (Del)") do delete_selected(app)
+	if focus_button(app, .Delete, {x + half + gap, y, half, ROW}, "Delete (Del)") do delete_selected(app)
 	y += ROW + S(6)
-	if rl.GuiButton({x, y, half, ROW}, "Rotate (R)") && app.selected >= 0 {
+	if focus_button(app, .Rotate, {x, y, half, ROW}, "Rotate (R)") && app.selected >= 0 {
 		rotate_region(&app.regions[app.selected], 1)
 		app.regions[app.selected].review = false
 		mark_preview_dirty(app)
 	}
-	if rl.GuiButton({x + half + gap, y, half, ROW}, "Full preview (P)") do toggle_big_preview(app)
+	if focus_button(app, .Full_Preview, {x + half + gap, y, half, ROW}, "Full preview (P)") do toggle_big_preview(app)
 	rl.GuiEnable()
 	y += ROW + S(6)
 	if !has_scan(app) || app.detect_job != nil do rl.GuiDisable()
-	if rl.GuiButton({x, y, w, ROW}, "Detecting..." if app.detect_job != nil else "Detect cards (D)") do start_detection(app)
+	if focus_button(app, .Detect, {x, y, w, ROW}, "Detecting..." if app.detect_job != nil else "Detect cards (D)") do start_detection(app)
 	rl.GuiEnable()
 	y += ROW + S(8)
 
@@ -128,6 +140,11 @@ draw_panel :: proc(app: ^App) {
 	@(static) list_scroll: f32
 	mouse := rl.GetMousePosition()
 	if rl.CheckCollisionPointRec(mouse, list) do list_scroll -= rl.GetMouseWheelMove() * LINE
+	if app.focus == .Cards && app.focus_moved && app.selected >= 0 {
+		// Keep the card chosen with Up/Down in view.
+		top := f32(app.selected) * LINE
+		list_scroll = clamp(list_scroll, top + LINE - list_h, top)
+	}
 	list_scroll = clamp(list_scroll, 0, max(0, f32(len(app.regions)) * LINE - list_h))
 	rl.BeginScissorMode(i32(list.x), i32(list.y), i32(list.width), i32(list.height))
 	for r, i in app.regions {
@@ -147,6 +164,7 @@ draw_panel :: proc(app: ^App) {
 		}
 	}
 	rl.BeginScissorMode(i32(px), 0, i32(panel_w), i32(panel_h)) // back to the panel's clip
+	if len(app.regions) > 0 do focus_control(app, .Cards, list)
 	y += list_h + S(8)
 
 	// --- Preview (fills the space between the card list and the export block) ---
@@ -176,12 +194,12 @@ draw_panel :: proc(app: ^App) {
 	rl.GuiLabel({x, y, w, S(22)}, "Folder")
 	y += S(24)
 	browse_w := S(90)
-	text_field(app, FIELD_DIR, {x, y, w - browse_w - gap, ROW}, app.out_dir[:])
-	if rl.GuiButton({x + w - browse_w, y, browse_w, ROW}, "Browse") do open_folder_dialog(app)
+	text_field(app, .Folder, {x, y, w - browse_w - gap, ROW}, app.out_dir[:])
+	if focus_button(app, .Browse, {x + w - browse_w, y, browse_w, ROW}, "Browse") do open_folder_dialog(app)
 	y += ROW + S(6)
 	label_w := S(110)
 	rl.GuiLabel({x, y, S(120), ROW}, "File prefix")
-	text_field(app, FIELD_PREFIX, {x + label_w, y, w - label_w, ROW}, app.prefix[:])
+	text_field(app, .Prefix, {x + label_w, y, w - label_w, ROW}, app.prefix[:])
 	y += ROW + S(4)
 	prefix := buf_string(app.prefix[:])
 	if prefix == "" do prefix = "card"
@@ -198,7 +216,7 @@ draw_panel :: proc(app: ^App) {
 		pending := moire_pending(app)
 		if len(app.regions) == 0 || pending do rl.GuiDisable()
 		export_label := fmt.ctprintf("Removing moiré... %d%%", moire_percent(app)) if pending else fmt.ctprintf("Export %d card(s)  (Ctrl+E)", len(app.regions))
-		if rl.GuiButton({x, y, w, ROW + S(4)}, export_label) do request_export(app)
+		if focus_button(app, .Export, {x, y, w, ROW + S(4)}, export_label) do request_export(app)
 		rl.GuiEnable()
 	}
 

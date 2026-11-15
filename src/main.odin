@@ -60,7 +60,7 @@ main :: proc() {
 		if !modal {
 			if app.big_open do handle_big_preview_input(&app)
 			else do handle_canvas_input(&app)
-			handle_keys(&app)
+			if !handle_focus_keys(&app) do handle_keys(&app)
 		}
 		update_previews(&app)
 
@@ -73,6 +73,7 @@ main :: proc() {
 		draw_panel(&app)
 		rl.GuiUnlock()
 		draw_status(&app, modal)
+		focus_end_frame(&app)
 		draw_confirm(&app)
 		browser_update_draw(&app.browser, &app.typing)
 		take_browser_result(&app)
@@ -126,7 +127,7 @@ handle_drops :: proc(app: ^App) {
 // ---------------------------------------------------------------------------
 
 handle_keys :: proc(app: ^App) {
-	if app.typing || app.edit_field != 0 do return
+	if app.typing || app.edit_field != .None do return
 	shift := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 	ctrl := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.LEFT_SUPER)
 
@@ -164,9 +165,9 @@ handle_keys :: proc(app: ^App) {
 		app.regions[app.selected].review = false
 		mark_preview_dirty(app)
 	}
-	if rl.IsKeyPressed(.TAB) {
-		// Cycle focus: whole card -> corner 1..4 -> whole card
-		// Values run -1 (whole card), 0..3 (corners); Shift+Tab goes backwards.
+	if rl.IsKeyPressed(.C) && !ctrl {
+		// Cycle the nudge target: whole card -> corner 1..4 -> whole card
+		// Values run -1 (whole card), 0..3 (corners); Shift+C goes backwards.
 		app.focused_corner = (app.focused_corner + 1 + (4 if shift else 1)) % 5 - 1
 	}
 	step := 10.0 if shift else 1.0
@@ -420,7 +421,7 @@ draw_status :: proc(app: ^App, modal: bool) {
 	bw := measure_text(label) + S(24)
 	button := rl.Rectangle{sw - bw - S(4), sh - status_h + S(3), bw, status_h - S(6)}
 	if modal do rl.GuiLock()
-	if rl.GuiButton(button, label) do app.quit = true
+	if focus_button(app, .Exit, button, label, in_panel = false) do app.quit = true
 	rl.GuiUnlock()
 
 	text := strings.clone_to_cstring(status_text(app), context.temp_allocator)
