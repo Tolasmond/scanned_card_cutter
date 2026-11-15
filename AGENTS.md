@@ -13,7 +13,7 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first: it cove
 ```sh
 ./build.sh            # optimized build -> build/scan_tool
 ./build.sh debug      # bounds checks and symbols
-./build.sh test       # imaging and synthetic-scan unit tests (headless)
+./build.sh test       # imaging, app (src) and synthetic-scan unit tests (headless)
 ./build.sh replay     # replay tests (opens a window, needs a display)
 ```
 

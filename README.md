@@ -4,11 +4,13 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 
 ## Workflow
 
-1. **Open a scan.** Use *Open scan…* (Ctrl+O), drop a PNG on the window, or pass the path as an argument.
+1. **Open a scan.** Use *Open scan…* (Ctrl+O), copy the PNG in your file manager and press **Ctrl+V** in the app, drop a PNG on the window, or pass the path as an argument.
 2. **Mark the cards.** Press **D** (*Detect cards*) to find them automatically, or press **A** and click a card's 4 corners in any order. A magnifier appears while you click or drag. The orange edge marks the card's top; press **R** to rotate it. Detected cards the detector is unsure of are drawn pink and marked *review* until you adjust them.
 3. **Adjust.** Drag corners or whole cards, or nudge them with the arrow keys. The preview shows the exact export output and updates as you edit. **P** opens it at full size.
 4. **Set the output.** Width, height, corner radius (output pixels) and edge trim (scan pixels). Tick **Remove moiré** (M) to filter out the printed halftone pattern (see below).
-5. **Export** (Ctrl+E). Each card is written as `<prefix>_NN.png` to the chosen folder. Dropping a folder on the window sets the output folder.
+5. **Export** (Ctrl+E). Each card is written as `<prefix>_NN.png` to the chosen folder. Pasting (Ctrl+V) or dropping a folder sets the output folder.
+
+**Drag and drop on Hyprland:** the app runs under XWayland, because Odin's bundled raylib is built for X11. Hyprland 0.56 does not deliver drags from native Wayland apps, such as GNOME Files, to XWayland windows. Use Ctrl+C in the file manager and Ctrl+V in the app instead. Drops from X11 apps, and on Windows and macOS, work normally.
 
 ## Controls
 
@@ -26,6 +28,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
 | M | Moiré removal on/off |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
+| Ctrl+V | Paste a file copied in a file manager: a PNG opens as the scan, a folder becomes the output folder |
 | Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |
 
 ### Card detection
@@ -149,6 +152,7 @@ The replay scan `tests/replay/synthetic_cards.png` comes from the small `replay_
 | `src/file_browser.odin` | Built-in file/folder browser (no OS dialog dependency) |
 | `src/detection.odin` | Runs detection in the background and adds the results as cards |
 | `src/moire.odin` | Runs the moiré filter once per scan in the background; picks the cleaned or original pixels |
+| `src/paste.odin` | Ctrl+V: parse clipboard paths (plain, `file://` URIs, GNOME copied files) |
 | `src/export.odin` | Background export thread and PNG writing |
 | `src/ui_scale.odin` | Interface scale: monitor detection, `S()`/`fs()` sizing helpers, scaled dialog frame |
 | `src/fonts.odin` | Inter fonts compiled into the executable, re-rendered for each scale; `draw_text`/`measure_text` |

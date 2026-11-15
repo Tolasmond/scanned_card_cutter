@@ -132,6 +132,7 @@ handle_keys :: proc(app: ^App) {
 
 	if ui_scale_keys(&app.ui, ctrl) do on_ui_scale_changed(app)
 	if ctrl && rl.IsKeyPressed(.Q) do app.quit = true
+	if ctrl && rl.IsKeyPressed(.V) do paste_from_clipboard(app)
 	if ctrl && rl.IsKeyPressed(.O) do open_scan_dialog(app)
 	if ctrl && rl.IsKeyPressed(.E) do request_export(app)
 	if !has_scan(app) do return
@@ -366,7 +367,7 @@ draw_scene :: proc(app: ^App, v: View, show_labels: bool) {
 draw_canvas :: proc(app: ^App) {
 	canvas := canvas_rect()
 	if !has_scan(app) {
-		msg: cstring = "Open a scan PNG (Ctrl+O) or drop one here"
+		msg: cstring = "Open a scan PNG (Ctrl+O), or copy one in your file manager and press Ctrl+V"
 		w := i32(measure_text(msg))
 		draw_text(msg, i32(canvas.width / 2) - w / 2, i32(canvas.height / 2 - S(10)), rl.LIGHTGRAY)
 		return

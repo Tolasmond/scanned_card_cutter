@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 mkdir -p build
 case "$1" in
   debug) odin build src -out:build/scan_tool -debug -vet -strict-style ;;
-  test)  odin test src/imaging -vet -strict-style && odin test tools/synth -vet -strict-style -o:speed ;;
+  test)  odin test src/imaging -vet -strict-style && odin test src -vet -strict-style && odin test tools/synth -vet -strict-style -o:speed ;;
   synth)
     [ -n "$2" ] || { echo "usage: ./build.sh synth OUTDIR [--clean] [--only PRESET] [--count N] [--scale S]"; exit 2; }
     odin build tools/synth -o:speed -vet -strict-style -out:build/synth
