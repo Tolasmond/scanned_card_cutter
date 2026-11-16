@@ -96,13 +96,20 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # a tag with a hyphen (v0.2.0-rc.1) is a pre-release
+      # A release made on GitHub first (its tag is what started this run)
+      # keeps its title and notes and gets the archives attached. Otherwise
+      # the release is created here, with generated notes; a tag with a
+      # hyphen (v0.2.0-rc.1) makes a pre-release.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
           sha256sum scanned_card_cutter-* > SHA256SUMS
-          prerelease=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}" scanned_card_cutter-* SHA256SUMS
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber scanned_card_cutter-* SHA256SUMS
+          else
+            prerelease=()
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}" scanned_card_cutter-* SHA256SUMS
+          fi
