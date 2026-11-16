@@ -16,6 +16,12 @@ It is a small desktop app written in [Odin](https://odin-lang.org) with raylib, 
 - **Open scans your way:** the built-in file browser, Ctrl+V after copying a file in your file manager, drag and drop, or the command line.
 - **Sharp on high-density monitors**, with the Inter font built in.
 
+## Copyright
+
+Card and board game art is usually copyrighted by its publisher or artist. Scanned Card Cutter is meant for cards you own or have permission to use: archiving your collection, making playtest copies or tabletop-simulator images for personal use, or working with print-and-play files and your own designs. Scanning a card doesn't give you the right to share or sell its images; check the publisher's policy before you do.
+
+This repository contains no third-party card art. Its test scans are generated procedurally (see [Development](doc/development.md#synthetic-scans)).
+
 ## Quick start
 
 Programs for Linux and Windows (x86-64) are on the [releases page](https://github.com/Tolasmond/scanned_card_cutter/releases).
