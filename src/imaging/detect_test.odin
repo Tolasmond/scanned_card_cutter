@@ -1,13 +1,13 @@
 package imaging
 
-// Synthetic scans ported from the original detector's test suite
-// (workers/test_candidate_detector.py). The drawing helpers are shared with
-// detect_blocks_test.odin, which tests the additions to the port.
+// Synthetic scenes for the base detection pipeline. The drawing helpers are
+// shared with detect_blocks_test.odin, which tests the block, frame and
+// artwork stages.
 
 import "core:testing"
 
 @(private)
-BED :: [3]u8{240, 236, 232} // the original tests' BGR (232, 236, 240)
+BED :: [3]u8{240, 236, 232} // BGR (232, 236, 240)
 
 @(private)
 background :: proc(w, h: int) -> Image {
@@ -24,7 +24,7 @@ put :: #force_inline proc(img: ^Image, x, y: int, c: [3]u8) {
 	p[0], p[1], p[2] = c[0], c[1], c[2]
 }
 
-// Colours are written as in the Python tests (BGR) and stored as RGB.
+// Colours are written as BGR, as OpenCV orders them, and stored as RGB.
 @(private)
 bgr :: proc(b, g, r: u8) -> [3]u8 {return {r, g, b}}
 

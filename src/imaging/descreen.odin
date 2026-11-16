@@ -1,7 +1,7 @@
 package imaging
 
-// Moiré (halftone) removal: a pure-Odin port of the original tool's "Soft"
-// descreen (workers/descreen_image.py, OpenCV 4.12):
+// Moiré (halftone) removal: the "Soft" descreen filter, built from pure-Odin
+// ports of OpenCV 4.12 kernels:
 //
 //   up    = resize(src, x1.5, INTER_CUBIC)
 //   up    = medianBlur(up, 3)
@@ -729,9 +729,9 @@ resize_area_cv :: proc(src: Image, dw, dh: int, allocator := context.allocator) 
 }
 
 // ---------------------------------------------------------------------------
-// Unsharp mask in float32, as the original Python does:
+// Unsharp mask in float32:
 //   f = img / 255; blur = GaussianBlur(f, sigma); s = clip(f*(1+a) - blur*a, 0, 1)
-//   out = uint8(s * 255)          (truncation, like numpy's astype)
+//   out = uint8(s * 255)          (truncation)
 // ---------------------------------------------------------------------------
 
 unsharp_cv :: proc(src: Image, sigma, amount: f32, allocator := context.allocator) -> Image {
@@ -792,7 +792,7 @@ unsharp_cv :: proc(src: Image, sigma, amount: f32, allocator := context.allocato
 				for ch in 0 ..< 3 {
 					f := f32(c.src.pix[o + ch]) / 255
 					s := clamp(f * alpha + blur[ch] * beta, 0, 1)
-					c.dst.pix[o + ch] = u8(s * 255) // truncates, like numpy astype(uint8)
+					c.dst.pix[o + ch] = u8(s * 255) // truncates
 				}
 				c.dst.pix[o + 3] = c.src.pix[o + 3]
 			}

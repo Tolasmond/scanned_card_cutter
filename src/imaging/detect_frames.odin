@@ -1,7 +1,6 @@
 package imaging
 
-// Cards whose frame has the colour of the scanner bed (an addition to the
-// ported detector, not part of detector 1.5.0).
+// Cards whose frame has the colour of the scanner bed.
 //
 // A white frame on a white lid is "background" to the colour masks, so the
 // proposal and its edge fit end at the artwork inside the frame. The card's

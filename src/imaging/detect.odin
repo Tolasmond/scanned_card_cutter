@@ -1,7 +1,6 @@
 package imaging
 
-// Card detection: a pure-Odin port of the original tool's classical detector
-// (workers/candidate_detector.py, version 1.5.0).
+// Card detection: a classical computer-vision pipeline in pure Odin.
 //
 //   1. Downscale the scan; find the scanner-bed colour as the dominant border
 //      colour (Lab).
@@ -15,13 +14,13 @@ package imaging
 //      drop proposals that contain several others, and recover missing cards
 //      from the row/column layout.
 //
-// Three stages were added to the port, each measured on the synthetic corpus
-// (see README.md, "Synthetic scans"):
+// Three further stages handle what the base pipeline cannot, each measured on
+// the synthetic corpus (see doc/development.md, "Synthetic scans"):
 //
 //   * detect_blocks.odin splits blocks of touching or overlapping cards at
 //     the notches their rounded corners leave, without needing a card size,
 //     and restores edges hidden under an overlapping card. It runs before the
-//     original grid split, which still handles what it leaves.
+//     grid split, which still handles what it leaves.
 //   * suppress_artwork (below) drops proposals that are artwork inside a card.
 //   * detect_frames.odin moves a card's sides from the artwork out to the
 //     faint real edge when its frame has the colour of the scanner bed.
@@ -48,7 +47,7 @@ Card_Candidate :: struct {
 	source:  Card_Source,
 }
 
-// Settings (DEFAULT_SETTINGS of detector 1.5.0).
+// Settings.
 @(private = "file") MAX_DETECTION_W :: 1800
 @(private = "file") MAX_DETECTION_H :: 1200
 @(private = "file") MIN_AREA_RATIO :: 0.01
@@ -405,7 +404,7 @@ background_color :: proc(lab: []f32, w, h: int) -> [3]f32 {
 		i := (y * w + x) * 3
 		append(border, [3]f32{lab[i], lab[i + 1], lab[i + 2]})
 	}
-	// Same order and overlap as the numpy concatenation: top, bottom, left, right strips.
+	// Border strips in a fixed order, overlapping at the corners: top, bottom, left, right.
 	for y in 0 ..< strip do for x in 0 ..< w do add(&border, lab, w, x, y)
 	for y in h - strip ..< h do for x in 0 ..< w do add(&border, lab, w, x, y)
 	for y in 0 ..< h do for x in 0 ..< strip do add(&border, lab, w, x, y)

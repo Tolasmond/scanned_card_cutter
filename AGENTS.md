@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for coding agents working on Scan Tool. Read `README.md` first: it covers the workflow, the controls and the source layout.
+Guidance for coding agents working on Scan Tool. Read `README.md` first, then the docs it links: `doc/usage.md` (workflow and controls), `doc/development.md` (building, tests, benchmarks and the baseline) and `doc/arch.md` (source layout and pipelines).
 
 ## Ground rules
 
@@ -22,24 +22,24 @@ All builds use `-vet -strict-style`. A change is done when `./build.sh test` and
 
 ## Card detection
 
-`src/imaging/detect.odin` is a port of the original detector 1.5.0 (`workers/candidate_detector.py` in the old DragonRuby tool). The ported constants and stages match the original. Three stages were added on top and are not in the original: `detect_blocks.odin` (splits blocks of touching or overlapping cards at their rounded-corner notches and restores edges hidden under an overlapping card), `detect_frames.odin` (moves a card's sides from the artwork out to the faint real edge of a bed-coloured frame) and `suppress_artwork` in `detect.odin`. All of it reads only the original scan.
+`src/imaging/detect.odin` is a classical computer-vision pipeline (see `doc/arch.md` → Card detection). Three stages handle what the base pipeline cannot: `detect_blocks.odin` (splits blocks of touching or overlapping cards at their rounded-corner notches and restores edges hidden under an overlapping card), `detect_frames.odin` (moves a card's sides from the artwork out to the faint real edge of a bed-coloured frame) and `suppress_artwork` in `detect.odin`. All of it reads only the original scan.
 
-Changing detection behavior is a quality decision, so measure it first on the synthetic corpus (see "Synthetic scans" below) with `./build.sh bench` (development split while tuning, holdout only as the final check), and compare with the baseline in `README.md`. `bench` prints one line per preset, so check the preset your change targets and the others for regressions. The synthetic tests in `detect_test.odin` come from the original suite, and `detect_blocks_test.odin` covers the additions; both must keep passing.
+Changing detection behavior is a quality decision, so measure it first on the synthetic corpus (see "Synthetic scans" below) with `./build.sh bench` (development split while tuning, holdout only as the final check), and compare with the baseline in `doc/development.md`. `bench` prints one line per preset, so check the preset your change targets and the others for regressions. The synthetic tests in `detect_test.odin` cover the base pipeline and `detect_blocks_test.odin` covers the added stages; both must keep passing.
 
 **A guess must ask for a check.** Detected cards with `source != .Full_Resolution_Edges` get `Region.review`, which is cleared when the user edits the card. Any stage that infers a side rather than measuring it (a seam between touching cards, a size taken from other cards, a faint edge) must return such a source. Record/replay runs detection synchronously.
 
 ## Synthetic scans
 
-`tools/synth` generates the test scans; see `README.md` → Testing → Synthetic scans. Rules:
+`tools/synth` generates the test scans; see `doc/development.md` → Synthetic scans. Rules:
 
 - **No real card art in the repository**, not even small crops. Scans of published games can't be redistributed. Test data is synthetic: procedural art, or public-domain images if ever needed.
-- **Keep it deterministic.** The generator uses its own PRNG and noise on purpose. Changing a preset or the rendering changes the corpus, so re-run both benchmarks and update the baseline in `README.md` in the same change, saying why.
+- **Keep it deterministic.** The generator uses its own PRNG and noise on purpose. Changing a preset or the rendering changes the corpus, so re-run both benchmarks and update the baseline in `doc/development.md` in the same change, saying why.
 - **Realism is part of correctness.** The simulation earns its keep only if it fails the detector and the filter in the ways real scans do. When you change it, compare with a real scan side by side at 1:1.
 - Generated corpora go in a temporary folder, never in the repository. The one committed synthetic scan is `tests/replay/synthetic_cards.png`, from the small `replay_small` preset.
 
 ## Moiré filter
 
-Measure changes with `./build.sh moire-bench` on a corpus made with `./build.sh synth DIR --clean`. `src/imaging/descreen.odin` ports OpenCV's kernels stage by stage: `INTER_CUBIC` resize, `medianBlur`, `fastNlMeansDenoisingColored` with OpenCV's integer Lab tables, `bilateralFilter`, `INTER_AREA` resize, and float32 unsharp. Keep it numerically faithful. A change to its output is a behavior change: check it against the original (`workers/descreen_image.py` in the old DragonRuby tool) on a real scan before updating any expected results. Record/replay runs the filter synchronously (`app.sync_jobs`) so replays never depend on timing.
+Measure changes with `./build.sh moire-bench` on a corpus made with `./build.sh synth DIR --clean`. `src/imaging/descreen.odin` ports OpenCV's kernels stage by stage: `INTER_CUBIC` resize, `medianBlur`, `fastNlMeansDenoisingColored` with OpenCV's integer Lab tables, `bilateralFilter`, `INTER_AREA` resize, and float32 unsharp. Keep it numerically faithful. A change to its output is a behavior change: check it against the same filter built with OpenCV 4.12 on a real scan before updating any expected results. Record/replay runs the filter synchronously (`app.sync_jobs`) so replays never depend on timing.
 
 **Never locate cards on filtered pixels.** The canvas, corner placement and card detection read the original scan (`app.scan_px`, `app.tex`). Only extraction (previews and exports) reads `extract_source(app)`. The filter softens card edges and the scanner background, which makes detection much worse. It keeps the image geometry, so corners found on the original apply to the cleaned pixels unchanged.
 

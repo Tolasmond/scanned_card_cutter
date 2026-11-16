@@ -13,7 +13,7 @@ Extract_Settings :: struct {
 // pixel (i, j) covers [i, i+1) x [j, j+1)) and returns a `settings.width` x
 // `settings.height` RGBA image with transparent rounded corners.
 //
-// Pipeline (mirrors the original ImageMagick command):
+// Pipeline:
 //   1. perspective warp at the quad's natural size (bicubic, ~1:1 scale)
 //   2. shave `edge_trim` pixels from each side
 //   3. Lanczos-3 resize to the target size

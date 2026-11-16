@@ -1,7 +1,7 @@
 package imaging
 
 // Splitting blocks of touching or overlapping cards without knowing the card
-// size (an addition to the ported detector, not part of detector 1.5.0).
+// size.
 //
 // Rounded cards that touch or overlap leave two kinds of bed-coloured marks:
 // a notch in the block's outline where two corners meet, and a small pocket

@@ -21,7 +21,7 @@ max_channel_diff :: proc(img: Image, c: [4]u8) -> int {
 
 // A uniform window pushes the NL-means sum to the edge of 32 bits; this once
 // turned white areas black. OpenCV's Lab round trip maps white to 254, and so
-// does the original Soft filter, so 254 is the expected result.
+// does the same filter built with OpenCV, so 254 is the expected result.
 @(test)
 test_descreen_keeps_white_white :: proc(t: ^testing.T) {
 	src := flat(48, 40, {255, 255, 255, 255})
@@ -58,7 +58,7 @@ test_descreen_preserves_alpha :: proc(t: ^testing.T) {
 }
 
 // A fine halftone dot grid (every third pixel, contrast 40) is flattened; the
-// original OpenCV filter takes its standard deviation from 12.7 to 0.0.
+// same filter built with OpenCV takes its standard deviation from 12.7 to 0.0.
 @(test)
 test_descreen_smooths_halftone :: proc(t: ^testing.T) {
 	W, H :: 96, 96
