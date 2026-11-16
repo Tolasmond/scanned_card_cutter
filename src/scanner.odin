@@ -340,6 +340,9 @@ destroy_scan_job :: proc(job: ^Scan_Job) {
 poll_scan :: proc(app: ^App) {
 	job := app.scan_job
 	if job == nil || !sync.atomic_load(&job.finished) do return
+	// A new scan replaces the current one, which an export is still writing:
+	// open it once the export is done.
+	if app.job != nil do return
 	thread.join(job.thread)
 	thread.destroy(job.thread)
 	app.scan_job = nil

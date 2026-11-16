@@ -44,7 +44,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scan Tool with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/` and the Inter font's license: `scan_tool-<tag>-linux-amd64.tar.gz` and `scan_tool-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
+`.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scan Tool with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/`, the Inter font's license and the Apache License 2.0 text (for the OpenCV ports and glad): `scan_tool-<tag>-linux-amd64.tar.gz` and `scan_tool-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
 
 The Linux program needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 and later), because Odin's prebuilt raylib is built against it. The programs are built for the baseline x86-64-v2 instruction set, Odin's default, so they run on any x86-64 CPU with SSE4.2 (Intel since 2008, AMD since 2011). There is no macOS release: Odin ships raylib for macOS, but the app has not been tested there.
 
@@ -117,7 +117,7 @@ Rules for changing the generator:
 
 - **Keep it deterministic.** The generator carries its own PRNG and noise on purpose. Changing a preset or the rendering changes the corpus, so re-run both benchmarks and update the baseline below in the same change, saying why.
 - **Realism is part of correctness.** The simulation earns its keep only if it fails the detector and the filter in the ways real scans do. When you change it, compare with a real scan side by side at 1:1.
-- **Corpora stay out of the repository.** Generate them in a temporary folder. The one committed synthetic scan is `tests/replay/synthetic_cards.png`, from the small `replay_small` preset: three cards at 150 dpi, with a touching pair that has to be split.
+- **Corpora stay out of the repository.** Generate them in a temporary folder. Two small synthetic scans are committed for the replay tests: `tests/replay/synthetic_cards.png`, from the `replay_small` preset (three cards at 150 dpi, with a touching pair that has to be split), and `tests/replay/synthetic_scan.png`, a 1200 x 900 scan of flat rectangles.
 
 Two scans per preset per split take about 2 minutes:
 

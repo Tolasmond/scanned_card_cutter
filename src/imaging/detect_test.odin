@@ -235,3 +235,16 @@ test_find_external_contours_skips_holes :: proc(t: ^testing.T) {
 		testing.expect_value(t, polygon_area(cs[0]), 15.0 * 15.0)
 	}
 }
+
+// Images too small or thin to hold a card must not read past their edges.
+@(test)
+test_detect_survives_thin_images :: proc(t: ^testing.T) {
+	sizes := [?][2]int{{1, 1}, {1, 50}, {50, 1}, {3600, 2}, {2, 3}, {7, 400}, {8, 8}, {9, 9}, {30, 3600}}
+	for sz in sizes {
+		img := background(sz[0], sz[1])
+		defer image_destroy(&img)
+		cands := detect_cards(img)
+		defer delete(cands)
+		testing.expectf(t, len(cands) == 0, "%d x %d: %d cards", sz[0], sz[1], len(cands))
+	}
+}

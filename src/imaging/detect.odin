@@ -50,6 +50,7 @@ Card_Candidate :: struct {
 // Settings.
 @(private = "file") MAX_DETECTION_W :: 1800
 @(private = "file") MAX_DETECTION_H :: 1200
+@(private = "file") MIN_DETECTION_SIDE :: 8
 @(private = "file") MIN_AREA_RATIO :: 0.01
 @(private = "file") MAX_AREA_RATIO :: 0.80
 @(private = "file") POLY_EPS_RATIO :: 0.02
@@ -104,6 +105,9 @@ detect_cards :: proc(src: Image, allocator := context.allocator) -> []Card_Candi
 	scale := min(1.0, f64(MAX_DETECTION_W) / f64(src.w), f64(MAX_DETECTION_H) / f64(src.h))
 	dw := max(1, int(math.floor(f64(src.w) * scale + 0.5)))
 	dh := max(1, int(math.floor(f64(src.h) * scale + 0.5)))
+	// Too small to hold a card, and too thin for the border strips and the
+	// 3x3 kernels below.
+	if min(dw, dh) < MIN_DETECTION_SIDE do return make([]Card_Candidate, 0, allocator)
 	det: Image
 	if dw == src.w && dh == src.h {
 		det = image_make(dw, dh)
