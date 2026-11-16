@@ -24,8 +24,9 @@ jobs:
     strategy:
       matrix:
         include:
-          # the oldest supported Ubuntu runner, for the oldest glibc
-          - os: ubuntu-22.04
+          # Odin's prebuilt raylib needs glibc 2.38 or newer (it calls the C23
+          # __isoc23_* functions), so Ubuntu 22.04's glibc 2.35 cannot link it
+          - os: ubuntu-24.04
             target: linux-amd64
           - os: windows-2025
             target: windows-amd64
