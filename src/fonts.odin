@@ -5,6 +5,8 @@
 // reloaded at the exact size whenever the interface scale changes.
 package main
 
+import "core:math"
+import "core:strconv"
 import rl "vendor:raylib"
 
 @(private = "file")
@@ -76,6 +78,26 @@ draw_text :: proc(text: cstring, x, y: i32, color: rl.Color) {
 
 measure_text :: proc(text: cstring) -> f32 {
 	return rl.MeasureTextEx(fonts.ui, text, f32(fonts.ui_size), 0).x
+}
+
+// Draws n right-aligned at right_x with every digit centred in a cell as wide
+// as the widest digit, so numbers line up in a column. Inter's digits are
+// proportional ("1" is narrow), and raylib can't turn on its tabular figures.
+draw_number_right :: proc(n: int, right_x, y: i32, color: rl.Color) {
+	digits: [20]u8
+	s := strconv.write_int(digits[:], i64(n), 10)
+	cell: f32 = 0
+	for d in u8('0') ..= u8('9') {
+		one := [2]u8{d, 0}
+		cell = max(cell, measure_text(cstring(&one[0])))
+	}
+	x := f32(right_x) - cell * f32(len(s))
+	for i in 0 ..< len(s) {
+		one := [2]u8{s[i], 0}
+		c := cstring(&one[0])
+		draw_text(c, i32(math.round(x + (cell - measure_text(c)) / 2)), y, color)
+		x += cell
+	}
 }
 
 draw_big_text :: proc(text: cstring, x, y: i32, color: rl.Color) {

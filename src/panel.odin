@@ -159,8 +159,9 @@ draw_panel :: proc(app: ^App) {
 	rl.GuiEnable()
 	y += ROW + S(8)
 
-	// Card list
-	list_h := 4 * LINE
+	// Card list: grows with the cards from 4 rows to 8, then scrolls; the
+	// preview below gets whatever space is left.
+	list_h := f32(clamp(len(app.regions), 4, 8)) * LINE
 	list := rl.Rectangle{x, y, w, list_h}
 	over_list := rl.CheckCollisionPointRec(rl.GetMousePosition(), list)
 	rl.DrawRectangleRec(list, rl.WHITE)
@@ -180,8 +181,7 @@ draw_panel :: proc(app: ^App) {
 		row := rl.Rectangle{list.x + 1, ry, list.width - 2, LINE}
 		if i == app.selected do rl.DrawRectangleRec(row, {255, 236, 150, 255})
 		nw, nh := im.quad_native_size(r.corners)
-		num := fmt.ctprintf("%d", i + 1)
-		draw_text(num, i32(row.x + S(32) - measure_text(num)), i32(ry + S(3)), rl.DARKGRAY)
+		draw_number_right(i + 1, i32(row.x + S(32)), i32(ry + S(3)), rl.DARKGRAY)
 		draw_text(fmt.ctprintf("scanned %d × %d", nw, nh), i32(row.x + S(44)), i32(ry + S(3)), rl.DARKGRAY)
 		if r.review {
 			tag: cstring = "review"
@@ -192,6 +192,8 @@ draw_panel :: proc(app: ^App) {
 		}
 	}
 	rl.BeginScissorMode(i32(px), 0, i32(panel_w), i32(panel_h)) // back to the panel's clip
+	// A click in the list gives it the keys, so Up/Down then step through the cards.
+	if len(app.regions) > 0 && !rl.GuiIsLocked() && over_list && rl.IsMouseButtonPressed(.LEFT) do app.focus = .Cards
 	if len(app.regions) > 0 do focus_control(app, .Cards, list)
 	y += list_h + S(8)
 

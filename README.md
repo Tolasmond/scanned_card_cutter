@@ -24,7 +24,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | Alt+C / Shift+Alt+C | Focus corner 1 of the next / previous card |
 | Tab / Shift+Tab | Move keyboard focus through the panel's buttons and boxes. A box is ready to type in when focused |
 | Enter / Space | Press the focused button or tick the focused box. Enter edits a focused box again after Esc |
-| Up / Down | With the card list focused: select the previous / next card |
+| Up / Down | With the card list focused (click it, or Tab to it): select the previous / next card |
 | Esc | Stop editing a box, then give the keys back to the canvas (so do clicks) |
 | R / Shift+R | Rotate the card's orientation 90° clockwise / counter-clockwise |
 | Del / Backspace | Delete the selected card |
