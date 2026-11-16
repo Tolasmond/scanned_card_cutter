@@ -1,0 +1,40 @@
+# The checks a change must pass (./build.sh check, build.bat check), with the
+# Odin release they are pinned to (actions/install-odin), on Linux and on
+# Windows. On Linux the replay tests run too, in a virtual X display; Windows
+# has no replay runner yet.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/install-odin
+
+      # X11 to link raylib against; Xvfb and Mesa's software OpenGL for the
+      # replay window
+      - name: Install X11, Xvfb and Mesa
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev xvfb libgl1-mesa-dri
+
+      - name: Checks
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ./build.sh check
+
+  check-windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/install-odin
+
+      - name: Checks
+        shell: cmd
+        run: build.bat check

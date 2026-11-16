@@ -1,0 +1,6 @@
+# Normalise text files to LF in the repository and in checkouts, so recordings
+# and expected results compare the same on every OS. Batch files need CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.ttf binary
