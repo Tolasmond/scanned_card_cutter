@@ -152,6 +152,7 @@ unload_scan :: proc(app: ^App) {
 	clear(&app.place_pts)
 	app.selected = -1
 	app.focused_corner = -1
+	app.drag = .None
 	app.placing = false
 	app.big_open = false
 	mark_preview_dirty(app)
@@ -163,6 +164,17 @@ load_scan :: proc(app: ^App, path: string, temporary := false) -> bool {
 	if app.job != nil {
 		set_status(app, true, "Wait for the export to finish before opening another scan.")
 		return false
+	}
+	// Check the signature first, so that pasting or dropping some huge file
+	// that is not a PNG does not read all of it.
+	switch png_signature(path) {
+	case .Unreadable:
+		set_status(app, true, "Could not read %s", path)
+		return false
+	case .Not_PNG:
+		set_status(app, true, "%s is not a PNG.", os.base(path))
+		return false
+	case .PNG:
 	}
 	data, err := os.read_entire_file(path, context.allocator)
 	if err != nil {
@@ -193,6 +205,23 @@ load_scan :: proc(app: ^App, path: string, temporary := false) -> bool {
 	set_status(app, false, "Opened %s (%d x %d). Press A to add a card, then click its 4 corners.", os.base(path), img.width, img.height)
 	if app.moire do start_cleaning(app)
 	return true
+}
+
+Png_Check :: enum {
+	PNG,
+	Not_PNG,
+	Unreadable,
+}
+
+// Whether the file starts with the 8-byte PNG signature.
+png_signature :: proc(path: string) -> Png_Check {
+	SIGNATURE :: [8]u8{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+	f, err := os.open(path)
+	if err != nil do return .Unreadable
+	defer os.close(f)
+	head: [8]u8
+	n, _ := os.read(f, head[:])
+	return .PNG if n == 8 && head == SIGNATURE else .Not_PNG
 }
 
 // GPUs cap texture size; display a reduced copy for very large scans.
@@ -332,10 +361,19 @@ select_region :: proc(app: ^App, index: int) {
 	if app.selected != index do mark_preview_dirty(app)
 	app.selected = index
 	app.focused_corner = -1
+	end_card_drag(app)
+}
+
+// A drag of a card or corner applies to the selected card, so it ends whenever
+// the selection changes or the card goes away (Esc, Delete, a new scan, or
+// detection selecting its first new card while the mouse is down).
+end_card_drag :: proc(app: ^App) {
+	if app.drag == .Corner || app.drag == .Body do app.drag = .None
 }
 
 delete_selected :: proc(app: ^App) {
 	if app.selected < 0 do return
+	end_card_drag(app)
 	ordered_remove(&app.regions, app.selected)
 	app.selected = min(app.selected, len(app.regions) - 1)
 	app.focused_corner = -1

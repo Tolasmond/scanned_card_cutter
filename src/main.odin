@@ -268,6 +268,7 @@ handle_canvas_input :: proc(app: ^App) {
 		return
 	}
 
+	if (app.drag == .Corner || app.drag == .Body) && (app.selected < 0 || app.selected >= len(app.regions)) do app.drag = .None
 	switch app.drag {
 	case .Corner:
 		set_corner(app, app.selected, app.drag_corner, msrc + app.drag_grab)
