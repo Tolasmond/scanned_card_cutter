@@ -26,7 +26,7 @@ run_job :: proc(args: []string, cancel_after: time.Duration = 0) -> ^Scan_Job {
 
 @(test)
 test_scan_worker :: proc(t: ^testing.T) {
-	dir, err := os.make_directory_temp("", "scan_tool_test-*", context.temp_allocator)
+	dir, err := os.make_directory_temp("", "scanned_card_cutter_test-*", context.temp_allocator)
 	testing.expect(t, err == nil)
 	defer os.remove_all(dir)
 	out, _ := os.join_path({dir, "scan.png"}, context.temp_allocator)
@@ -47,7 +47,7 @@ test_scan_worker :: proc(t: ^testing.T) {
 	free(job)
 
 	// A program that doesn't exist.
-	job = run_job({"scan_tool_no_such_program_xyz", "{out}"})
+	job = run_job({"scanned_card_cutter_no_such_program_xyz", "{out}"})
 	testing.expect(t, job.start_err != nil)
 	free(job)
 

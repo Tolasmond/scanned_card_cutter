@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for coding agents working on Scan Tool. Read `README.md` first, then the docs it links: `doc/usage.md` (workflow and controls), `doc/development.md` (building, tests, benchmarks and the baseline) and `doc/arch.md` (source layout and pipelines).
+Guidance for coding agents working on Scanned Card Cutter. Read `README.md` first, then the docs it links: `doc/usage.md` (workflow and controls), `doc/development.md` (building, tests, benchmarks and the baseline) and `doc/arch.md` (source layout and pipelines).
 
 ## Ground rules
 
@@ -12,7 +12,7 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first, then th
 ## Build and check
 
 ```sh
-./build.sh            # optimized build -> build/scan_tool
+./build.sh            # optimized build -> build/scanned_card_cutter
 ./build.sh debug      # bounds checks and symbols
 ./build.sh test       # imaging, app (src) and synthetic-scan unit tests (headless)
 ./build.sh replay     # replay tests (opens a window, needs a display)
@@ -53,8 +53,8 @@ All layout sizes are written for 1x and go through `S()` (sizes) and `fs()` (fon
 `src/replay.odin` records input frame by frame with raylib's automation events and plays it back. A replay ends with a state dump: settings, each card's corners, the selection and the status line. The runner compares that dump and every exported PNG with the saved expected results.
 
 ```sh
-build/scan_tool --record FILE.rec [--out DIR] SCAN.png     # closing the window saves
-build/scan_tool --replay FILE.rec [--out DIR] [--dump STATE.txt] [--fast]
+build/scanned_card_cutter --record FILE.rec [--out DIR] SCAN.png     # closing the window saves
+build/scanned_card_cutter --replay FILE.rec [--out DIR] [--dump STATE.txt] [--fast]
 ```
 
 Exit codes: 0 done, 1 could not write the recording or dump, 2 bad arguments or an unreadable recording, 3 the replay window size differs from the recording, 4 the replay timed out waiting for previews or export.
@@ -71,7 +71,7 @@ When a replay fails, read the diff. A `state.txt` difference shows which card or
 ### Adding a test
 
 1. Put a small scan in `tests/replay/` (a synthetic one is fine; keep committed scans small). Use an empty scratch folder for `--out`.
-2. Run `build/scan_tool --record tests/replay/NAME.rec --out SCRATCH/out tests/replay/SCAN.png`, use the app, and close the window. The console says `recorded N events over M frames`. Input can come from a person or from any tool that drives the window.
+2. Run `build/scanned_card_cutter --record tests/replay/NAME.rec --out SCRATCH/out tests/replay/SCAN.png`, use the app, and close the window. The console says `recorded N events over M frames`. Input can come from a person or from any tool that drives the window.
 3. Replay with `--dump` and check that the dump and the exported PNGs show what was intended. The replay's exports must be byte-identical to the live session's.
 4. Delete the `out` line from the `.rec` file (the runner passes its own `--out`), keep the `scan` line relative to the recording (`scan SCAN.png`), then run `./build.sh replay --update`.
 

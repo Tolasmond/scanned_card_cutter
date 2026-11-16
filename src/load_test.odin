@@ -6,7 +6,7 @@ import "core:testing"
 // load_scan checks the PNG signature before reading a whole file.
 @(test)
 test_png_signature :: proc(t: ^testing.T) {
-	dir, err := os.make_directory_temp("", "scan_tool_test-*", context.temp_allocator)
+	dir, err := os.make_directory_temp("", "scanned_card_cutter_test-*", context.temp_allocator)
 	if !testing.expect_value(t, err, nil) do return
 	defer os.remove_all(dir)
 	file :: proc(dir, name: string, data: []u8) -> string {

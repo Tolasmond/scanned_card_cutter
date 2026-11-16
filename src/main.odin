@@ -1,4 +1,4 @@
-// Scan Tool: extract straightened, rounded-corner card images from a flatbed scan.
+// Scanned Card Cutter: extract straightened, rounded-corner card images from a flatbed scan.
 package main
 
 import "core:fmt"
@@ -22,7 +22,7 @@ main :: proc() {
 
 	rl.SetConfigFlags(harness_window_flags(&h, opts.fast))
 	win_w, win_h := harness_window_size(&h)
-	rl.InitWindow(win_w, win_h, "Scan Tool")
+	rl.InitWindow(win_w, win_h, "Scanned Card Cutter")
 	rl.SetWindowMinSize(900, 650)
 	rl.SetExitKey(.KEY_NULL)
 	rl.SetTargetFPS(0 if opts.fast else 60)

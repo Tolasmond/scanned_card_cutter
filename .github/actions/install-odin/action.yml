@@ -1,4 +1,4 @@
-# Installs the Odin release that Scan Tool is pinned to, checked against its
+# Installs the Odin release that Scanned Card Cutter is pinned to, checked against its
 # SHA-256, and puts it on the PATH. Used by check.yml and release.yml, so the
 # pin is kept here alone.
 name: Install Odin

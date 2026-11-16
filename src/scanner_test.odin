@@ -34,12 +34,12 @@ command=b {out}
 
 @(test)
 test_split_command :: proc(t: ^testing.T) {
-	args, ok := split_command(`"C:\Program Files\NAPS2\NAPS2.Console.exe"  --profile 'Scan Tool' -o {out}`, context.temp_allocator)
+	args, ok := split_command(`"C:\Program Files\NAPS2\NAPS2.Console.exe"  --profile 'Scanned Card Cutter' -o {out}`, context.temp_allocator)
 	testing.expect(t, ok)
 	testing.expect_value(t, len(args), 5)
 	if len(args) == 5 {
 		testing.expect_value(t, args[0], `C:\Program Files\NAPS2\NAPS2.Console.exe`)
-		testing.expect_value(t, args[2], "Scan Tool")
+		testing.expect_value(t, args[2], "Scanned Card Cutter")
 		testing.expect_value(t, args[4], "{out}")
 	}
 	// Quotes inside an argument join with it; an empty quoted argument is kept.

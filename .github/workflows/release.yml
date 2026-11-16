@@ -1,4 +1,4 @@
-# Publishes a GitHub release when a version tag (v*) is pushed: Scan Tool
+# Publishes a GitHub release when a version tag (v*) is pushed: Scanned Card Cutter
 # built with -o:speed on Linux and Windows x86-64, the platforms check.yml
 # tests, once the checks pass on the tagged commit. Each archive holds the
 # program, LICENSE, THIRD_PARTY.md, README.md, doc/, the Inter font's
@@ -54,14 +54,14 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then version="$GITHUB_REF_NAME"; else version="dev-${GITHUB_SHA::7}"; fi
-          echo "PACKAGE=scan_tool-$version-${{ matrix.target }}" >> "$GITHUB_ENV"
+          echo "PACKAGE=scanned_card_cutter-$version-${{ matrix.target }}" >> "$GITHUB_ENV"
 
       - name: Build and package (Linux)
         if: runner.os == 'Linux'
         run: |
           ./build.sh
           mkdir -p "dist/$PACKAGE"
-          cp build/scan_tool LICENSE THIRD_PARTY.md README.md assets/fonts/Inter-LICENSE.txt licenses/Apache-2.0.txt "dist/$PACKAGE/"
+          cp build/scanned_card_cutter LICENSE THIRD_PARTY.md README.md assets/fonts/Inter-LICENSE.txt licenses/Apache-2.0.txt "dist/$PACKAGE/"
           cp -r doc "dist/$PACKAGE/"
           tar -czf "dist/$PACKAGE.tar.gz" -C dist "$PACKAGE"
 
@@ -72,7 +72,7 @@ jobs:
           cmd /c build.bat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Path "dist\$($env:PACKAGE)" | Out-Null
-          Copy-Item build\scan_tool.exe, LICENSE, THIRD_PARTY.md, README.md, assets\fonts\Inter-LICENSE.txt, licenses\Apache-2.0.txt "dist\$($env:PACKAGE)\"
+          Copy-Item build\scanned_card_cutter.exe, LICENSE, THIRD_PARTY.md, README.md, assets\fonts\Inter-LICENSE.txt, licenses\Apache-2.0.txt "dist\$($env:PACKAGE)\"
           Copy-Item -Recurse doc "dist\$($env:PACKAGE)\doc"
           Compress-Archive -Path "dist\$($env:PACKAGE)" -DestinationPath "dist\$($env:PACKAGE).zip"
 
@@ -102,7 +102,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
-          sha256sum scan_tool-* > SHA256SUMS
+          sha256sum scanned_card_cutter-* > SHA256SUMS
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}" scan_tool-* SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}" scanned_card_cutter-* SHA256SUMS

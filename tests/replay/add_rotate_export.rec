@@ -1,4 +1,4 @@
-scan_tool-replay 1
+scanned_card_cutter-replay 1
 size 1500 950
 scan synthetic_scan.png
 e 0 7 0 0 0 0

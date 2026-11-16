@@ -1,6 +1,6 @@
-# Developing Scan Tool
+# Developing Scanned Card Cutter
 
-How to build Scan Tool, run its tests, and measure changes to detection and moiré removal. For how the code is organized, see [Architecture](arch.md).
+How to build Scanned Card Cutter, run its tests, and measure changes to detection and moiré removal. For how the code is organized, see [Architecture](arch.md).
 
 ## Ground rules
 
@@ -15,7 +15,7 @@ How to build Scan Tool, run its tests, and measure changes to detection and moir
 Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin release includes the matching prebuilt raylib in `vendor:raylib`. CI and releases are pinned to Odin `dev-2026-10` (commit `84bc3fc`) in `.github/actions/install-odin`.
 
 ```sh
-./build.sh                    # optimized build -> build/scan_tool
+./build.sh                    # optimized build -> build/scanned_card_cutter
 ./build.sh debug              # bounds checks and symbols
 ./build.sh test               # imaging, app and synthetic-scan unit tests (headless)
 ./build.sh replay [--update]  # replay tests (opens a window)
@@ -25,7 +25,7 @@ Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin
 ./build.sh moire-bench DIR [split]              # score moiré removal on a synthetic corpus
 ```
 
-On Windows, `build.bat` builds `build\scan_tool.exe` (needs the MSVC linker, as Odin does). `build.bat debug` makes a debug build, `build.bat test` runs the unit tests, and `build.bat check` runs every check except the replay tests.
+On Windows, `build.bat` builds `build\scanned_card_cutter.exe` (needs the MSVC linker, as Odin does). `build.bat debug` makes a debug build, `build.bat test` runs the unit tests, and `build.bat check` runs every check except the replay tests.
 
 All builds use `-vet -strict-style`. A change is done when `./build.sh check` passes: the debug and optimized builds, `odin check` of the tools, the unit tests and the replay tests.
 
@@ -44,7 +44,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scan Tool with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/`, the Inter font's license and the Apache License 2.0 text (for the OpenCV ports and glad): `scan_tool-<tag>-linux-amd64.tar.gz` and `scan_tool-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
+`.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scanned Card Cutter with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/`, the Inter font's license and the Apache License 2.0 text (for the OpenCV ports and glad): `scanned_card_cutter-<tag>-linux-amd64.tar.gz` and `scanned_card_cutter-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
 
 The Linux program needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 and later), because Odin's prebuilt raylib is built against it. The programs are built for the baseline x86-64-v2 instruction set, Odin's default, so they run on any x86-64 CPU with SSE4.2 (Intel since 2008, AMD since 2011). There is no macOS release: Odin ships raylib for macOS, but the app has not been tested there.
 
@@ -61,7 +61,7 @@ The Linux program needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 
 Whole editing sessions can be recorded and replayed. This uses raylib's automation events, so it needs nothing beyond Odin.
 
 ```sh
-build/scan_tool --record tests/replay/NAME.rec [--out DIR] SCAN.png
+build/scanned_card_cutter --record tests/replay/NAME.rec [--out DIR] SCAN.png
 ./build.sh replay --update   # save NAME.expected/ from the current build
 ./build.sh replay            # replay every recording and compare
 ```
@@ -69,7 +69,7 @@ build/scan_tool --record tests/replay/NAME.rec [--out DIR] SCAN.png
 Recording saves the mouse and keyboard input frame by frame when you close the window. A replay plays it back at the same frames, waits for previews, detection, the moiré filter and any export to finish, and writes a state dump: settings, cards with corner positions, selection and the status line. The runner replays every `tests/replay/*.rec` with `--fast` into a temporary folder and compares the dump and every exported PNG with `tests/replay/NAME.expected/`. To run one replay by hand:
 
 ```sh
-build/scan_tool --replay NAME.rec [--out DIR] [--dump state.txt] [--fast]
+build/scanned_card_cutter --replay NAME.rec [--out DIR] [--dump state.txt] [--fast]
 ```
 
 A recording names its scan. A relative path is looked up in the working directory, then next to the recording.
@@ -87,7 +87,7 @@ Read the diff. A `state.txt` difference shows which card or setting changed, and
 ### Adding a replay test
 
 1. Put a small scan in `tests/replay/`. A synthetic one is fine, and every committed scan must be small. Use an empty scratch folder for `--out`.
-2. Run `build/scan_tool --record tests/replay/NAME.rec --out SCRATCH/out tests/replay/SCAN.png`, use the app, and close the window. The console says `recorded N events over M frames`. Input can come from a person or from any tool that drives the window.
+2. Run `build/scanned_card_cutter --record tests/replay/NAME.rec --out SCRATCH/out tests/replay/SCAN.png`, use the app, and close the window. The console says `recorded N events over M frames`. Input can come from a person or from any tool that drives the window.
 3. Replay with `--dump` and check that the dump and the exported PNGs show what was intended. The replay's exports must be byte-identical to the live session's.
 4. Delete the `out` line from the `.rec` file (the runner passes its own `--out`), keep the `scan` line relative to the recording (`scan SCAN.png`), then run `./build.sh replay --update`.
 
@@ -102,7 +102,7 @@ Read the diff. A `state.txt` difference shows which card or setting changed, and
 
 Keep your hands off the window during a replay: a real pointer wandering over it is overridden, but real clicks and keys are not.
 
-On Windows, `build.bat` has no `replay` runner yet; run `scan_tool.exe --replay` directly.
+On Windows, `build.bat` has no `replay` runner yet; run `scanned_card_cutter.exe --replay` directly.
 
 ## Synthetic scans
 

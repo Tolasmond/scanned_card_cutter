@@ -1,6 +1,6 @@
 # Architecture
 
-Scan Tool is one Odin program in two packages: the application (`src/`), which owns the window, the interface and the background jobs, and a pure image-processing library (`src/imaging/`), which has no raylib dependency and is unit tested headless. Development tools in `tools/` reuse the library.
+Scanned Card Cutter is one Odin program in two packages: the application (`src/`), which owns the window, the interface and the background jobs, and a pure image-processing library (`src/imaging/`), which has no raylib dependency and is unit tested headless. Development tools in `tools/` reuse the library.
 
 ## Source layout
 

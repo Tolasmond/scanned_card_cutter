@@ -1,6 +1,6 @@
 # Third-party components
 
-Scan Tool's own code is under the [MIT License](LICENSE). It includes, links or adapts the components below, which keep their own licenses. Release archives carry this file, `Inter-LICENSE.txt` and `Apache-2.0.txt` next to the program.
+Scanned Card Cutter's own code is under the [MIT License](LICENSE). It includes, links or adapts the components below, which keep their own licenses. Release archives carry this file, `Inter-LICENSE.txt` and `Apache-2.0.txt` next to the program.
 
 ## Bundled with this repository
 
@@ -27,7 +27,7 @@ Windowing, input, drawing, image loading and PNG writing. Linked statically from
 - Copyright (c) 2013-2026 Ramon Santamaria (@raysan5) (<https://www.raylib.com>)
 - License: zlib, in `vendor/raylib/LICENSE` in the Odin installation
 
-raylib includes further libraries. These are the ones linked into Scan Tool; their notices are in raylib's source under `src/external` (<https://github.com/raysan5/raylib/tree/master/src/external>):
+raylib includes further libraries. These are the ones linked into Scanned Card Cutter; their notices are in raylib's source under `src/external` (<https://github.com/raysan5/raylib/tree/master/src/external>):
 
 - GLFW, windows and input: zlib
 - glad, the OpenGL loader: the generated loader is under WTFPL or CC0-1.0, and the OpenGL API definitions it is generated from are under the Apache License 2.0 (see [OpenCV](#opencv) for the text)

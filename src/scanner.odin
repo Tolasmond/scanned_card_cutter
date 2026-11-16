@@ -19,7 +19,7 @@ import "core:time/timezone"
 SCANNERS_FILE :: "scanners.ini"
 SCAN_OUTPUT_KEEP :: 4096 // bytes of the command's output kept for error messages
 
-SCANNERS_EXAMPLE :: `# Scanner profiles for Scan Tool.
+SCANNERS_EXAMPLE :: `# Scanner profiles for Scanned Card Cutter.
 #
 # Each [section] is one profile. The Scan button runs the chosen profile's
 # command, which must write a PNG to {out}; the app opens it and deletes it.
@@ -36,9 +36,9 @@ SCANNERS_EXAMPLE :: `# Scanner profiles for Scan Tool.
 # [Flatbed 300 dpi]
 # command = scanimage --source Flatbed --mode Color --resolution 300 --format=png -o {out}
 
-# Windows: NAPS2 (naps2.com). Set up a profile named "Scan Tool" in NAPS2 first.
+# Windows: NAPS2 (naps2.com). Set up a profile named "Scanned Card Cutter" in NAPS2 first.
 # [NAPS2]
-# command = "C:\Program Files\NAPS2\NAPS2.Console.exe" --profile "Scan Tool" -o {out}
+# command = "C:\Program Files\NAPS2\NAPS2.Console.exe" --profile "Scanned Card Cutter" -o {out}
 `
 
 Scanner_Profile :: struct {
@@ -64,7 +64,7 @@ Scan_Job :: struct {
 scanners_path :: proc(allocator := context.allocator) -> (string, bool) {
 	dir, err := os.user_config_dir(context.temp_allocator)
 	if err != nil || dir == "" do return "", false
-	p, jerr := os.join_path({dir, "scan_tool", SCANNERS_FILE}, allocator)
+	p, jerr := os.join_path({dir, "scanned_card_cutter", SCANNERS_FILE}, allocator)
 	return p, jerr == nil
 }
 
@@ -225,7 +225,7 @@ start_scan :: proc(app: ^App) {
 		set_status(app, true, "Scanner [%s]: the command has an unclosed quote.", prof.name)
 		return
 	}
-	dir, derr := os.make_directory_temp("", "scan_tool-*", context.allocator)
+	dir, derr := os.make_directory_temp("", "scanned_card_cutter-*", context.allocator)
 	if derr != nil {
 		set_status(app, true, "Could not make a temporary folder for the scan.")
 		return

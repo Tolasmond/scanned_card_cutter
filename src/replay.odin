@@ -1,9 +1,9 @@
 // Input record/replay harness for regression tests, built on raylib's
 // automation events.
 //
-//   scan_tool --record session.rec [--out DIR] scan.png
+//   scanned_card_cutter --record session.rec [--out DIR] scan.png
 //       Use the app normally; closing the window saves the recording.
-//   scan_tool --replay session.rec [--out DIR] [--dump state.txt] [--fast]
+//   scanned_card_cutter --replay session.rec [--out DIR] [--dump state.txt] [--fast]
 //       Re-runs the recorded input frame by frame, waits for previews and any
 //       export to finish, writes the state dump, then exits.
 //
@@ -17,7 +17,7 @@ import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
 
-REPLAY_MAGIC :: "scan_tool-replay 1"
+REPLAY_MAGIC :: "scanned_card_cutter-replay 1"
 HARNESS_W :: 1500
 HARNESS_H :: 950
 REPLAY_SETTLE_FRAMES :: 3 // idle frames after the last event before the dump
@@ -70,9 +70,9 @@ Harness :: struct {
 }
 
 USAGE :: `usage:
-  scan_tool [scan.png]
-  scan_tool --record FILE [--out DIR] [scan.png]
-  scan_tool --replay FILE [--out DIR] [--dump FILE] [--fast]
+  scanned_card_cutter [scan.png]
+  scanned_card_cutter --record FILE [--out DIR] [scan.png]
+  scanned_card_cutter --replay FILE [--out DIR] [--dump FILE] [--fast]
 
   --record FILE  record input until the window closes, then save it to FILE
   --replay FILE  replay FILE, write the --dump state file, and exit
@@ -185,11 +185,11 @@ harness_frame :: proc(h: ^Harness, app: ^App) -> bool {
 			rl.StopAutomationEventRecording()
 			h.recording = false
 			set_status(app, true, "Recording stopped: the window was resized, which a replay cannot reproduce.")
-			fmt.eprintfln("scan_tool: recording stopped at frame %d: window resized from %v to %v", h.frame, h.size, size)
+			fmt.eprintfln("scanned_card_cutter: recording stopped at frame %d: window resized from %v to %v", h.frame, h.size, size)
 		}
 	case .Replay:
 		if size != h.size {
-			fmt.eprintfln("scan_tool: replay window is %d x %d but %s was recorded at %d x %d", size.x, size.y, h.path, h.size.x, h.size.y)
+			fmt.eprintfln("scanned_card_cutter: replay window is %d x %d but %s was recorded at %d x %d", size.x, size.y, h.path, h.size.x, h.size.y)
 			h.exit_code = 3
 			return false
 		}
@@ -214,7 +214,7 @@ harness_frame :: proc(h: ^Harness, app: ^App) -> bool {
 		if h.settled >= REPLAY_SETTLE_FRAMES do return false
 		last := int(h.events[len(h.events) - 1].frame) if len(h.events) > 0 else 0
 		if h.frame - last > REPLAY_TIMEOUT_FRAMES {
-			fmt.eprintln("scan_tool: replay timed out waiting for previews/export to finish")
+			fmt.eprintln("scanned_card_cutter: replay timed out waiting for previews/export to finish")
 			h.exit_code = 4
 			return false
 		}
@@ -229,16 +229,16 @@ harness_finish :: proc(h: ^Harness, app: ^App) {
 	case .Record:
 		if h.recording do rl.StopAutomationEventRecording()
 		if err := save_recording(h); err != nil {
-			fmt.eprintfln("scan_tool: could not write %s: %v", h.path, err)
+			fmt.eprintfln("scanned_card_cutter: could not write %s: %v", h.path, err)
 			h.exit_code = 1
 		} else {
-			fmt.printfln("scan_tool: recorded %d events over %d frames to %s", len(h.events), h.frame, h.path)
+			fmt.printfln("scanned_card_cutter: recorded %d events over %d frames to %s", len(h.events), h.frame, h.path)
 		}
 		rl.UnloadAutomationEventList(h.list)
 	case .Replay:
 		if h.exit_code != 0 || h.dump_path == "" do return
 		if err := os.write_entire_file(h.dump_path, transmute([]u8)state_dump(app)); err != nil {
-			fmt.eprintfln("scan_tool: could not write %s: %v", h.dump_path, err)
+			fmt.eprintfln("scanned_card_cutter: could not write %s: %v", h.dump_path, err)
 			h.exit_code = 1
 		}
 	}
@@ -253,7 +253,7 @@ harness_destroy :: proc(h: ^Harness) {
 }
 
 // File format, one record per line:
-//   scan_tool-replay 1
+//   scanned_card_cutter-replay 1
 //   size <width> <height>
 //   scan <path>                      (optional)
 //   out <path>                       (optional)
@@ -274,7 +274,7 @@ save_recording :: proc(h: ^Harness) -> os.Error {
 load_recording :: proc(h: ^Harness) -> bool {
 	data, err := os.read_entire_file(h.path, context.allocator)
 	if err != nil {
-		fmt.eprintfln("scan_tool: could not read %s: %v", h.path, err)
+		fmt.eprintfln("scanned_card_cutter: could not read %s: %v", h.path, err)
 		return false
 	}
 	defer delete(data)
@@ -285,7 +285,7 @@ load_recording :: proc(h: ^Harness) -> bool {
 		line := strings.trim_right(raw, "\r")
 		if n == 1 {
 			if line != REPLAY_MAGIC {
-				fmt.eprintfln("scan_tool: %s is not a scan_tool recording", h.path)
+				fmt.eprintfln("scanned_card_cutter: %s is not a scanned_card_cutter recording", h.path)
 				return false
 			}
 			continue
@@ -319,7 +319,7 @@ load_recording :: proc(h: ^Harness) -> bool {
 		}
 	}
 	if h.size == {} {
-		fmt.eprintfln("scan_tool: %s has no size line", h.path)
+		fmt.eprintfln("scanned_card_cutter: %s has no size line", h.path)
 		return false
 	}
 	return true
@@ -327,7 +327,7 @@ load_recording :: proc(h: ^Harness) -> bool {
 
 @(private = "file")
 bad_line :: proc(h: ^Harness, n: int) -> bool {
-	fmt.eprintfln("scan_tool: %s:%d: unreadable line", h.path, n)
+	fmt.eprintfln("scanned_card_cutter: %s:%d: unreadable line", h.path, n)
 	return false
 }
 

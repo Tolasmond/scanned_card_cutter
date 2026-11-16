@@ -1,6 +1,6 @@
 #!/bin/sh
-# Build Scan Tool on Linux or macOS using only the Odin toolchain.
-#   ./build.sh                  optimized build  -> build/scan_tool
+# Build Scanned Card Cutter on Linux or macOS using only the Odin toolchain.
+#   ./build.sh                  optimized build  -> build/scanned_card_cutter
 #   ./build.sh debug            debug build with bounds checks and symbols
 #   ./build.sh test             run the imaging, app and synthetic-scan unit tests
 #   ./build.sh replay           replay tests/replay/*.rec and compare with *.expected/
@@ -14,7 +14,7 @@ set -e
 cd "$(dirname "$0")"
 mkdir -p build
 case "$1" in
-  debug) odin build src -out:build/scan_tool -debug -vet -strict-style ;;
+  debug) odin build src -out:build/scanned_card_cutter -debug -vet -strict-style ;;
   test)  odin test src/imaging -vet -strict-style && odin test src -vet -strict-style && odin test tools/synth -vet -strict-style -o:speed ;;
   synth)
     [ -n "$2" ] || { echo "usage: ./build.sh synth OUTDIR [--clean] [--only PRESET] [--count N] [--scale S]"; exit 2; }
@@ -27,9 +27,9 @@ case "$1" in
     [ -n "$3" ] || { echo "usage: ./build.sh bench ANNOTATIONS.json IMAGE_DIR [development|holdout]"; exit 2; }
     odin run tools/detect_bench -o:speed -vet -strict-style -out:build/detect_bench -- "$2" "$3" $4 $5 $6 ;;
   replay)
-    odin build src -out:build/scan_tool -o:speed -vet -strict-style
+    odin build src -out:build/scanned_card_cutter -o:speed -vet -strict-style
     set -- tests/replay/*.rec "$2"
-    if [ ! -e "$1" ]; then echo "No recordings in tests/replay/ (make one with: build/scan_tool --record tests/replay/NAME.rec SCAN.png)"; exit 0; fi
+    if [ ! -e "$1" ]; then echo "No recordings in tests/replay/ (make one with: build/scanned_card_cutter --record tests/replay/NAME.rec SCAN.png)"; exit 0; fi
     update=""
     failed=0
     for arg in "$@"; do [ "$arg" = "--update" ] && update=1; done
@@ -38,9 +38,9 @@ case "$1" in
       expected="${rec%.rec}.expected"
       out=$(mktemp -d)
       code=0
-      build/scan_tool --replay "$rec" --out "$out" --dump "$out/state.txt" --fast >"$out/log.txt" 2>&1 || code=$?
+      build/scanned_card_cutter --replay "$rec" --out "$out" --dump "$out/state.txt" --fast >"$out/log.txt" 2>&1 || code=$?
       if [ "$code" -ne 0 ]; then
-        echo "FAIL  $rec (exit $code)"; grep "scan_tool:" "$out/log.txt" || true
+        echo "FAIL  $rec (exit $code)"; grep "scanned_card_cutter:" "$out/log.txt" || true
         failed=$((failed + 1))
       elif [ -n "$update" ]; then
         rm -rf "$expected" && mkdir -p "$expected"
@@ -60,10 +60,10 @@ case "$1" in
     [ "$failed" -eq 0 ] || { echo "$failed replay test(s) failed"; exit 1; }
     ;;
   check)
-    odin build src -out:build/scan_tool -debug -vet -strict-style
+    odin build src -out:build/scanned_card_cutter -debug -vet -strict-style
     for tool in tools/synth tools/detect_bench tools/moire_bench; do odin check "$tool" -vet -strict-style; done
     sh ./build.sh test
     sh ./build.sh replay
     ;;
-  *)     odin build src -out:build/scan_tool -o:speed -vet -strict-style ;;
+  *)     odin build src -out:build/scanned_card_cutter -o:speed -vet -strict-style ;;
 esac

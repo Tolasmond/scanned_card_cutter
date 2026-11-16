@@ -1,6 +1,6 @@
-# Using Scan Tool
+# Using Scanned Card Cutter
 
-Scan Tool works on one scan per session. Open a scan, mark the cards, adjust them, and export. There are no projects to save: once the cards are exported, the scan is done.
+Scanned Card Cutter works on one scan per session. Open a scan, mark the cards, adjust them, and export. There are no projects to save: once the cards are exported, the scan is done.
 
 ## Workflow
 
@@ -45,9 +45,9 @@ Scan Tool works on one scan per session. Open a scan, mark the cards, adjust the
 
 | OS | File |
 | --- | --- |
-| Linux | `~/.config/scan_tool/scanners.ini` (or under `$XDG_CONFIG_HOME`) |
-| macOS | `~/Library/Application Support/scan_tool/scanners.ini` |
-| Windows | `%LOCALAPPDATA%\scan_tool\scanners.ini` |
+| Linux | `~/.config/scanned_card_cutter/scanners.ini` (or under `$XDG_CONFIG_HOME`) |
+| macOS | `~/Library/Application Support/scanned_card_cutter/scanners.ini` |
+| Windows | `%LOCALAPPDATA%\scanned_card_cutter\scanners.ini` |
 
 Pressing *Scan* before the file exists writes it with commented-out examples. Each section is one profile:
 
