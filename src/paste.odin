@@ -2,9 +2,10 @@
 //
 // File managers put a copied file on the clipboard as a plain path, a
 // file:// URI list, or GNOME's "copy\nfile://..." form; raylib reads the text
-// form. This is also the reliable way in where drag and drop does not arrive,
-// such as Wayland file managers dropping onto this XWayland window on
-// Hyprland.
+// form. Windows Explorer puts a file list instead (CF_HDROP, read in
+// paste_windows.odin); a copied text path still works there too. This is also
+// the reliable way in where drag and drop does not arrive, such as Wayland
+// file managers dropping onto this XWayland window on Hyprland.
 package main
 
 import "core:os"
@@ -66,8 +67,8 @@ percent_decode :: proc(s: string, allocator := context.allocator) -> string {
 }
 
 paste_from_clipboard :: proc(app: ^App) {
-	text := string(rl.GetClipboardText())
-	paths := clipboard_paths(text, context.temp_allocator)
+	paths := clipboard_file_list(context.temp_allocator)
+	if len(paths) == 0 do paths = clipboard_paths(string(rl.GetClipboardText()), context.temp_allocator)
 	for p in paths {
 		if os.is_dir(p) {
 			buf_set(app.out_dir[:], p)

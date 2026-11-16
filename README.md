@@ -45,7 +45,7 @@ Extracts straightened card images from a flatbed scan and saves them as PNGs wit
 | --- | --- |
 | Linux | `~/.config/scan_tool/scanners.ini` (or under `$XDG_CONFIG_HOME`) |
 | macOS | `~/Library/Application Support/scan_tool/scanners.ini` |
-| Windows | `%APPDATA%\scan_tool\scanners.ini` |
+| Windows | `%LOCALAPPDATA%\scan_tool\scanners.ini` |
 
 Pressing *Scan* before the file exists writes it with commented-out examples. Each section is one profile:
 
