@@ -44,6 +44,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+Creating the release on GitHub (*Releases → Draft a new release*, with a new `v` tag) works too: publishing it creates the tag, and the workflow then attaches the archives and `SHA256SUMS` to that release, keeping its title and notes.
+
 `.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scanned Card Cutter with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/`, the Inter font's license and the Apache License 2.0 text (for the OpenCV ports and glad): `scanned_card_cutter-<tag>-linux-amd64.tar.gz` and `scanned_card_cutter-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
 
 The Linux program needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 and later), because Odin's prebuilt raylib is built against it. The programs are built for the baseline x86-64-v2 instruction set, Odin's default, so they run on any x86-64 CPU with SSE4.2 (Intel since 2008, AMD since 2011). There is no macOS release: Odin ships raylib for macOS, but the app has not been tested there.
