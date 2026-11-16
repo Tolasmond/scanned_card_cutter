@@ -12,23 +12,41 @@ How to build Scan Tool, run its tests, and measure changes to detection and moir
 
 ## Building
 
-Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin release includes the matching prebuilt raylib in `vendor:raylib`.
+Requires the [Odin](https://odin-lang.org) toolchain for your OS. Each OS's Odin release includes the matching prebuilt raylib in `vendor:raylib`. CI and releases are pinned to Odin `dev-2026-10` (commit `84bc3fc`) in `.github/actions/install-odin`.
 
 ```sh
 ./build.sh                    # optimized build -> build/scan_tool
 ./build.sh debug              # bounds checks and symbols
 ./build.sh test               # imaging, app and synthetic-scan unit tests (headless)
 ./build.sh replay [--update]  # replay tests (opens a window)
+./build.sh check              # every check a change must pass: builds, tools, unit and replay tests
 ./build.sh synth DIR [...]    # generate synthetic test scans
 ./build.sh bench ANN DIR [split] [--dump FILE]  # score card detection against annotation file ANN
 ./build.sh moire-bench DIR [split]              # score moiré removal on a synthetic corpus
 ```
 
-On Windows, `build.bat` builds `build\scan_tool.exe` (needs the MSVC linker, as Odin does). `build.bat debug` makes a debug build and `build.bat test` runs the imaging unit tests.
+On Windows, `build.bat` builds `build\scan_tool.exe` (needs the MSVC linker, as Odin does). `build.bat debug` makes a debug build, `build.bat test` runs the unit tests, and `build.bat check` runs every check except the replay tests.
 
-All builds use `-vet -strict-style`. A change is done when `./build.sh test` and `./build.sh replay` both pass.
+All builds use `-vet -strict-style`. A change is done when `./build.sh check` passes: the debug and optimized builds, `odin check` of the tools, the unit tests and the replay tests.
 
 raylib is linked statically. The Linux binary needs only the system X11/GL libraries every desktop has. Build each platform on that platform (or in CI): Odin can target another OS, but producing the final program needs that OS's linker and system libraries.
+
+## Continuous integration
+
+`.github/workflows/check.yml` runs on every push to `main` and every pull request: `./build.sh check` on Ubuntu 24.04, with the replay tests in a virtual X display (Xvfb with Mesa's software OpenGL), and `build.bat check` on Windows Server 2025. Both install the pinned Odin release with `.github/actions/install-odin`, which checks the download's SHA-256.
+
+## Releases
+
+Pushing a tag that starts with `v` publishes a GitHub release of the tagged commit:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` runs the checks on Linux (Ubuntu 24.04) and on Windows, builds Scan Tool with `-o:speed` on each, and packages the program with `LICENSE`, `THIRD_PARTY.md`, `README.md`, `doc/` and the Inter font's license: `scan_tool-<tag>-linux-amd64.tar.gz` and `scan_tool-<tag>-windows-amd64.zip`. The release, named for the tag, has notes GitHub generates from the pull requests since the last release, the two archives, and `SHA256SUMS`. A tag with a hyphen (`v0.2.0-rc.1`) makes a pre-release. If a check fails, nothing is published; delete the tag (`git push --delete origin v0.1.0`), fix the commit, and tag again. A pull request that changes the workflow or `install-odin` builds and packages the archives without publishing them, and they can be downloaded from the run's artifacts.
+
+The Linux program needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 and later), because Odin's prebuilt raylib is built against it. The programs are built for the baseline x86-64-v2 instruction set, Odin's default, so they run on any x86-64 CPU with SSE4.2 (Intel since 2008, AMD since 2011). There is no macOS release: Odin ships raylib for macOS, but the app has not been tested there.
 
 ## Unit tests
 

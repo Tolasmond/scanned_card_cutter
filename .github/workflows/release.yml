@@ -1,0 +1,107 @@
+# Publishes a GitHub release when a version tag (v*) is pushed: Scan Tool
+# built with -o:speed on Linux and Windows x86-64, the platforms check.yml
+# tests, once the checks pass on the tagged commit. Each archive holds the
+# program, LICENSE, THIRD_PARTY.md, README.md, doc/ and the Inter font's
+# license (the font is compiled into the program); SHA256SUMS lists the
+# archives' checksums. A pull request that changes this file or
+# actions/install-odin builds and packages without publishing
+# (doc/development.md, "Releases").
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/actions/install-odin/**
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Odin's prebuilt raylib needs glibc 2.38 or newer (it calls the C23
+          # __isoc23_* functions), so Ubuntu 22.04's glibc 2.35 cannot link it
+          - os: ubuntu-24.04
+            target: linux-amd64
+          - os: windows-2025
+            target: windows-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/install-odin
+
+      - name: Install X11, Xvfb and Mesa
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-dev xvfb libgl1-mesa-dri
+
+      - name: Checks (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ./build.sh check
+
+      - name: Checks (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build.bat check
+
+      - name: Name the archive
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then version="$GITHUB_REF_NAME"; else version="dev-${GITHUB_SHA::7}"; fi
+          echo "PACKAGE=scan_tool-$version-${{ matrix.target }}" >> "$GITHUB_ENV"
+
+      - name: Build and package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./build.sh
+          mkdir -p "dist/$PACKAGE"
+          cp build/scan_tool LICENSE THIRD_PARTY.md README.md assets/fonts/Inter-LICENSE.txt "dist/$PACKAGE/"
+          cp -r doc "dist/$PACKAGE/"
+          tar -czf "dist/$PACKAGE.tar.gz" -C dist "$PACKAGE"
+
+      - name: Build and package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmd /c build.bat
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Path "dist\$($env:PACKAGE)" | Out-Null
+          Copy-Item build\scan_tool.exe, LICENSE, THIRD_PARTY.md, README.md, assets\fonts\Inter-LICENSE.txt "dist\$($env:PACKAGE)\"
+          Copy-Item -Recurse doc "dist\$($env:PACKAGE)\doc"
+          Compress-Archive -Path "dist\$($env:PACKAGE)" -DestinationPath "dist\$($env:PACKAGE).zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # a tag with a hyphen (v0.2.0-rc.1) is a pre-release
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum scan_tool-* > SHA256SUMS
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes "${prerelease[@]}" scan_tool-* SHA256SUMS

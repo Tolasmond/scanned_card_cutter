@@ -8,6 +8,8 @@
 #   ./build.sh synth DIR [opts] generate synthetic scans + DIR/annotations.json (tools/synth)
 #   ./build.sh bench ANN DIR    score card detection: annotation file ANN, scans in DIR
 #   ./build.sh moire-bench DIR  score moiré removal on a corpus made with `synth DIR --clean`
+#   ./build.sh check            every check a change must pass: the debug and optimized
+#                               builds, the tools, the unit tests and the replay tests
 set -e
 cd "$(dirname "$0")"
 mkdir -p build
@@ -56,6 +58,12 @@ case "$1" in
       rm -rf "$out"
     done
     [ "$failed" -eq 0 ] || { echo "$failed replay test(s) failed"; exit 1; }
+    ;;
+  check)
+    odin build src -out:build/scan_tool -debug -vet -strict-style
+    for tool in tools/synth tools/detect_bench tools/moire_bench; do odin check "$tool" -vet -strict-style; done
+    sh ./build.sh test
+    sh ./build.sh replay
     ;;
   *)     odin build src -out:build/scan_tool -o:speed -vet -strict-style ;;
 esac

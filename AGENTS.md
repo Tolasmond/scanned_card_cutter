@@ -16,9 +16,10 @@ Guidance for coding agents working on Scan Tool. Read `README.md` first, then th
 ./build.sh debug      # bounds checks and symbols
 ./build.sh test       # imaging, app (src) and synthetic-scan unit tests (headless)
 ./build.sh replay     # replay tests (opens a window, needs a display)
+./build.sh check      # all of the above plus the debug build and the tools: what CI runs
 ```
 
-All builds use `-vet -strict-style`. A change is done when `./build.sh test` and `./build.sh replay` both pass.
+All builds use `-vet -strict-style`. A change is done when `./build.sh check` passes: the debug and optimized builds, `odin check` of the tools, `./build.sh test` and `./build.sh replay`. CI (`.github/workflows/check.yml`) runs it on Linux and `build.bat check` (everything but the replays) on Windows.
 
 ## Card detection
 
