@@ -2,7 +2,7 @@
 # Build Scan Tool on Linux or macOS using only the Odin toolchain.
 #   ./build.sh                  optimized build  -> build/scan_tool
 #   ./build.sh debug            debug build with bounds checks and symbols
-#   ./build.sh test             run the imaging and synthetic-scan unit tests
+#   ./build.sh test             run the imaging, app and synthetic-scan unit tests
 #   ./build.sh replay           replay tests/replay/*.rec and compare with *.expected/
 #   ./build.sh replay --update  (re)write the expected results from the current build
 #   ./build.sh synth DIR [opts] generate synthetic scans + DIR/annotations.json (tools/synth)

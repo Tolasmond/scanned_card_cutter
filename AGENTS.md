@@ -36,7 +36,7 @@ Changing detection behavior is a quality decision, so measure it first on the sy
 - **No real card art in the repository**, not even small crops. Scans of published games can't be redistributed. Test data is synthetic: procedural art, or public-domain images if ever needed.
 - **Keep it deterministic.** The generator uses its own PRNG and noise on purpose. Changing a preset or the rendering changes the corpus, so re-run both benchmarks and update the baseline in `doc/development.md` in the same change, saying why.
 - **Realism is part of correctness.** The simulation earns its keep only if it fails the detector and the filter in the ways real scans do. When you change it, compare with a real scan side by side at 1:1.
-- Generated corpora go in a temporary folder, never in the repository. The one committed synthetic scan is `tests/replay/synthetic_cards.png`, from the small `replay_small` preset.
+- Generated corpora go in a temporary folder, never in the repository. The committed scans are `tests/replay/synthetic_cards.png`, from the small `replay_small` preset, and `tests/replay/synthetic_scan.png`, flat rectangles. Keep any new one small and synthetic.
 
 ## Moiré filter
 

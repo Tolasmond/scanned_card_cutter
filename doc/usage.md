@@ -33,6 +33,8 @@ Scan Tool works on one scan per session. Open a scan, mark the cards, adjust the
 | P / Space | Full-size preview (wheel zoom, drag pan, 1 = 100%, F = fit, Esc closes) |
 | M | Moiré removal on/off |
 | Ctrl+= / Ctrl+- / Ctrl+0 | Larger / smaller interface, or back to automatic |
+| Ctrl+O / Open… button | Open a scan with the built-in file browser |
+| Ctrl+E / Export button | Export every card (asks before overwriting files) |
 | Ctrl+N / Scan button | Scan with the chosen scanner profile (the button cancels a running scan) |
 | Ctrl+V | Paste a file copied in a file manager: a PNG opens as the scan, a folder becomes the output folder |
 | Ctrl+Q / Exit button | Quit (waits for a running export to finish writing its files) |

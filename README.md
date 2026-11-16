@@ -18,7 +18,12 @@ It is a small desktop app written in [Odin](https://odin-lang.org) with raylib, 
 
 ## Quick start
 
-Programs for Linux and Windows (x86-64) are on the [releases page](https://github.com/Tolasmond/odin_scan_tool/releases). To build it yourself, install the [Odin toolchain](https://odin-lang.org/docs/install/) for your OS, then:
+Programs for Linux and Windows (x86-64) are on the [releases page](https://github.com/Tolasmond/odin_scan_tool/releases).
+
+- **Linux:** needs glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39 or later) and an X11 or XWayland desktop.
+- **Windows:** needs Windows 10 version 1903 or later and the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) (2015–2022, x64), which most Windows computers already have.
+
+To build it yourself, install the [Odin toolchain](https://odin-lang.org/docs/install/) for your OS, then:
 
 ```sh
 ./build.sh                 # Linux and macOS: builds build/scan_tool
